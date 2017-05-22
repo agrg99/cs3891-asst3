@@ -35,7 +35,6 @@
  */
 
 
-#include <vm.h>
 #include "opt-dumbvm.h"
 
 struct vnode;
@@ -58,9 +57,25 @@ struct addrspace {
         size_t as_npages2;
         paddr_t as_stackpbase;
 #else
-        /* Put stuff here for your VM system */
+        struct region *regions;     /* linked list of regions */
 #endif
 };
+
+/* regions for sections in binary */
+struct region {
+        int permissions;            /* the permissions of the region */
+        int old_permissions;        /* the original permissions */
+        vaddr_t start;              /* virtual address where this lays */
+        size_t size;                /* size of the region */
+        struct region *next;        /* pointer to the next region */
+};
+
+/* append a region to an address space */
+int append_region(struct addrspace *as, int permissions, vaddr_t start,
+                size_t size);
+
+
+#include <vm.h>
 
 /*
  * Functions in addrspace.c:

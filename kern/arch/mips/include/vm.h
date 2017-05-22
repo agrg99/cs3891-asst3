@@ -77,6 +77,18 @@ kvaddr_to_paddr(vaddr_t vaddr){
     return ((vaddr) - MIPS_KSEG0);
 }
 
+#define FINDEX_TO_KVADDR(int) findex_to_kvaddr(int)
+static inline vaddr_t
+findex_to_kvaddr(int index){
+    return(PADDR_TO_KVADDR(index * PAGE_SIZE));
+}
+
+#define KVADDR_TO_FINDEX(vaddr) kvaddr_to_findex(vaddr)
+static inline int
+kvaddr_to_findex(vaddr_t vaddr){
+    return(KVADDR_TO_PADDR(vaddr) / PAGE_SIZE);
+}
+
 /*
  * The top of user space. (Actually, the address immediately above the
  * last valid user address.)

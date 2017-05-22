@@ -38,15 +38,53 @@
 
 
 #include <machine/vm.h>
+#include <addrspace.h>
 
 /* Fault-type arguments to vm_fault() */
 #define VM_FAULT_READ        0    /* A read was attempted */
 #define VM_FAULT_WRITE       1    /* A write was attempted */
 #define VM_FAULT_READONLY    2    /* A write to a readonly page was attempted*/
 
+#define VM_INVALID_INDEX	 -1	  /* invalid pointer index */
+
+#define PAGE_SIZE 4096	/* page size for hpt */
+#define PAGE_BITS 12	/* number of bits in vpn */
+// ----------------------------------------------------------------------------
+
+/* layout of a frame table entry */
+struct frame_entry {
+	int fe_refcount;				/* number of references to this frame */
+	char fe_used;				/* number of references to this frame */
+	int fe_next;				/* number of references to this frame */
+};
+
+/* pointer to the frame table */
+struct frame_entry *ft;					
+
+/* the index for the top level free frame */
+int cur_free;
+
+/* layout of a page table entry */
+struct page_entry {
+	int pe_proc_id;					/* the process id */
+	int pe_frame_num;				/* the frame table frame num */
+	int pe_perms;					/* page permissions and flags */
+	struct frame_entry *pe_next;	/* pointer to collion next entry */
+};
+
+/* pointer to the hashed page table */
+struct page_entry *hpt;
+
+// ----------------------------------------------------------------------------
 
 /* Initialization function */
 void vm_bootstrap(void);
+
+/* init the frametable */
+void frametable_init(void);
+
+/* Hashing function for HPT entries */
+uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr);
 
 /* Fault handling function called by trap code */
 int vm_fault(int faulttype, vaddr_t faultaddress);
@@ -54,6 +92,9 @@ int vm_fault(int faulttype, vaddr_t faultaddress);
 /* Allocate/free kernel heap pages (called by kmalloc/kfree) */
 vaddr_t alloc_kpages(unsigned npages);
 void free_kpages(vaddr_t addr);
+
+
+int search_hpt(struct addrspace *as, vaddr_t address);
 
 /* TLB shootdown handling called from interprocessor_interrupt */
 void vm_tlbshootdown(const struct tlbshootdown *);
