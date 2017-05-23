@@ -342,6 +342,7 @@ file      proc/pid.c
 #
 
 file      vm/kmalloc.c
+file	  vm/tlb.c
 
 optofffile dumbvm   vm/addrspace.c
 optofffile dumbvm   vm/frametable.c

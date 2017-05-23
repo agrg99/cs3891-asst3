@@ -1,11 +1,10 @@
 #include <types.h>
 #include <kern/errno.h>
 #include <lib.h>
-#include <thread.h>
-#include <addrspace.h>
-#include <vm.h>
-#include <machine/tlb.h>
 #include <mips/tlb.h>
+#include <tlb.h>
+#include <vm.h>
+#include <spl.h>
 
 /* insert a record into the tlb */
 /* insert_tlb
@@ -23,7 +22,7 @@ void insert_tlb(int vpn, int ppn)
  */
 void flush_tlb()
 {
-        int, spl;
+        int i, spl;
         spl = splhigh();
         for (i=0; i<NUM_TLB; i++) {
                 tlb_write(TLBHI_INVALID(i), TLBLO_INVALID(), i);
