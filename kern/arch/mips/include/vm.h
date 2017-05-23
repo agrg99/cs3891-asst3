@@ -35,8 +35,20 @@
  * Machine-dependent VM system definitions.
  */
 
-#define PAGE_SIZE  4096         /* size of VM page */
-#define PAGE_FRAME 0xfffff000   /* mask for getting page number from addr */
+#define PAGE_SIZE   4096        /* size of VM page */
+#define PAGE_FRAME  0xfffff000	/* mask for getting page number from addr */
+#define PAGE_PRES   0x1		/* mask for getting PPN from page entry */
+#define PAGE_PROT   0x6		/* mask for getting the protection bits */
+#define PAGE_MOD    0x8		/* mask for getting the modified bit */
+#define PAGE_REF    0x10	/* mask for getting the referenced bit */
+#define PAGE_CAD    0x20	/* mask for getting the cache disabled bit */
+
+/* mask and shift macro for ease of use */
+#define GET_PAGE_PRES(X)	X & PAGE_PRES		/* 'valid' bit */
+#define GET_PAGE_PROT(X)	(X & PAGE_PROT) >> 1	/* protections */
+#define GET_PAGE_MOD(X)		(X & PAGE_MOD) >> 3	/* 'dirty' bit */
+#define GET_PAGE_REF(X)		(X & PAGE_REF) >> 4	/* accessed? */
+#define GET_PAGE_CAD(X)		(X & PAGE_CAD) >> 5	/* bypass cache? */
 
 /*
  * MIPS-I hardwired memory layout:
@@ -80,13 +92,13 @@ kvaddr_to_paddr(vaddr_t vaddr){
 #define FINDEX_TO_KVADDR(int) findex_to_kvaddr(int)
 static inline vaddr_t
 findex_to_kvaddr(int index){
-    return(PADDR_TO_KVADDR(index * PAGE_SIZE));
+    return(PADDR_TO_KVADDR(index << 12));
 }
 
 #define KVADDR_TO_FINDEX(vaddr) kvaddr_to_findex(vaddr)
 static inline int
 kvaddr_to_findex(vaddr_t vaddr){
-    return(KVADDR_TO_PADDR(vaddr) / PAGE_SIZE);
+    return(KVADDR_TO_PADDR(vaddr) >> 12);
 }
 
 /*

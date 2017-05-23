@@ -53,9 +53,9 @@
 
 /* layout of a frame table entry */
 struct frame_entry {
-	int fe_refcount;				/* number of references to this frame */
-	char fe_used;				/* number of references to this frame */
-	int fe_next;				/* number of references to this frame */
+	int fe_refcount;			/* number of references to this frame */
+	char fe_used;				/* flag to indicate if this frame is free */
+	int fe_next;				/* if this frame is free, index of next free */
 };
 
 /* pointer to the frame table */
@@ -67,14 +67,15 @@ int cur_free;
 /* layout of a page table entry */
 struct page_entry {
 	int pe_proc_id;					/* the process id */
-	int pe_frame_num;				/* the frame table frame num */
-	int pe_perms;					/* page permissions and flags */
-	struct frame_entry *pe_next;	/* pointer to collion next entry */
+	int pe_ppn;						/* the frame table frame num */
+	char pe_flags;					/* page permissions and flags */
+	int pe_next;					/* pointer to collion next entry */
 };
 
 /* pointer to the hashed page table */
 struct page_entry *hpt;
 
+int hpt_size;
 // ----------------------------------------------------------------------------
 
 /* Initialization function */

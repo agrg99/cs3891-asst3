@@ -24,38 +24,58 @@ uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr)
  * alloc_kpages still uses the stealmem function. */
 void vm_bootstrap(void)
 {
-        /* can get away with kmalloc here, as it still uses the basic
-         * stealmem function */
-        kprintf("we called bootstrap\n");
         frametable_init();
+
+        /* create the page table */
+        kprintf("time to setup page table\n");
+        hpt = (struct page_entry *)kmalloc(hpt_size * sizeof(struct page_entry));
+        int i;
+        /* init the page table */
+        for(i = 0; i < hpt_size; i++) {
+                hpt[i].pe_proc_id = VM_INVALID_INDEX;
+                hpt[i].pe_ppn   = VM_INVALID_INDEX;
+                hpt[i].pe_flags = VM_INVALID_INDEX;
+                hpt[i].pe_next  = VM_INVALID_INDEX;
+        }
 }
 
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-        (void) faulttype;
-        (void) faultaddress;
+        int offset;
+        struct page_entry *pe;
 
+        /* fault if we tried to write to a readonly page */
+        if (faulttype == VM_FAULT_READONLY)
+                return EFAULT;
 
-        
+        /* get page entry */
+        pe = search_hpt(faultaddress);
+        if (pe == NULL) {
+                /* page fault */
+                (void)pe;
+        }
 
-        // if pte->valid == 1
+        if GET_PAGE_PRES(pe->pe_flags) {
         //   pte->flag has pt_r?
-        //      return
+        //      return EFAULT;
         //   else
         //      pte->dirty?
         //         load from swap
         //      else
         //         load from elf
         //      update tlb, page table and frame table
-        // else
+        }
+        else {
         //   if segment is code
         //     load from elf
         //   else
         //     allocate a zeroed page
+        }
         //   update tlb, page table and frame table
         
-
+        offset = faultaddress & ~PAGE_FRAME;    /* get the offset */
+        (void)offset;
         /* get frame physical address */
         //p_address = getpage();
 
@@ -69,27 +89,39 @@ vm_fault(int faulttype, vaddr_t faultaddress)
  * search the page table for a vpn number, and return the physical page num
  * if found, otherwise return -1
  */
-int
-search_hpt(struct addrspace *as, vaddr_t address)
+struct *page_entry search_hpt(vaddr_t addr)
 {
-        vaddr_t p_address;
-        uint32_t pt_hash;
-        int vpn, offset;
+        uint32_t pt_hash, pid;
+        struct addrspace *as;
+        int vpn;
 
-        vpn = address >> 12;        /* get the vpn from the address */
-        offset = address & 0xFF;    /* get the offset */
+        /* get the current as */
+        as = proc_getas();
+
+        /* get the vpn from the address */
+        vpn = addr & PAGE_FRAME; 
 
         /* get the hash index from hte hpt */
         pt_hash = hpt_hash(as, vpn);
 
-        /* get the page table entry */
-        struct page_entry pe = hpt[pt_hash];
-        
-        (void)p_address;
-        (void)pe;
-        (void)offset;
+        /* get addrspace id (secretly the pointer to the addrspace) */
+        pid = (uint32_t) as;
 
-        return 0;       
+        /* get the page table entry */
+        struct page_entry *pe = &hpt[pt_hash];
+
+        /* loop the chain while we don't have an entry for this proc */
+        while(pe->pe_proc_id != pid && pe->pe_proc_id != VM_INVALID_INDEX) {
+                pe = &hpt[pe->pe_next];
+        }
+
+        /* we didn't find the desired entry - page fault! */
+        if (pe->pe_proc_id == VM_INVALID_INDEX) {
+                return NULL;
+        }
+
+        /* return the PPN if the page is valid, otherwise -1 */
+        return pe;
 }
 
 //int
@@ -104,8 +136,7 @@ search_hpt(struct addrspace *as, vaddr_t address)
  * SMP-specific functions.  Unused in our configuration.
  */
 
-void
-vm_tlbshootdown(const struct tlbshootdown *ts)
+void vm_tlbshootdown(const struct tlbshootdown *ts)
 {
         (void)ts;
         panic("vm tried to do tlb shootdown?!\n");
