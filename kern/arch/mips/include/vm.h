@@ -43,12 +43,27 @@
 #define PAGE_REF    0x10	/* mask for getting the referenced bit */
 #define PAGE_CAD    0x20	/* mask for getting the cache disabled bit */
 
+#define PROT_RO	    0x2		/* read only perms */
+#define PROT_RW	    0x3		/* read write perms */
+
 /* mask and shift macro for ease of use */
 #define GET_PAGE_PRES(X)	X & PAGE_PRES		/* 'valid' bit */
 #define GET_PAGE_PROT(X)	(X & PAGE_PROT) >> 1	/* protections */
 #define GET_PAGE_MOD(X)		(X & PAGE_MOD) >> 3	/* 'dirty' bit */
 #define GET_PAGE_REF(X)		(X & PAGE_REF) >> 4	/* accessed? */
 #define GET_PAGE_CAD(X)		(X & PAGE_CAD) >> 5	/* bypass cache? */
+
+/* set certain flags */
+#define SET_PAGE_PRES(X)	X | PAGE_PRES		/* 'valid' bit */
+#define SET_PAGE_PROT(X, P)	X | P			/* protections */
+#define SET_PAGE_MOD(X)		X | PAGE_MOD		/* 'dirty' bit */
+#define SET_PAGE_REF(X)		X | PAGE_REF		/* accessed? */
+#define SET_PAGE_CAD(X)		X | PAGE_CAD		/* bypass cache? */
+
+#define SEG_CODE    1	/* identifier for code section */
+#define SEG_DATA    2	/* identifier for data section */
+#define SEG_HEAP    3	/* identifier for heap section */
+#define SEG_STACK   4	/* identifier for stack section */
 
 /*
  * MIPS-I hardwired memory layout:
@@ -99,6 +114,12 @@ findex_to_kvaddr(int index){
 static inline int
 kvaddr_to_findex(vaddr_t vaddr){
     return(KVADDR_TO_PADDR(vaddr) >> 12);
+}
+
+#define ADDR_TO_PN(addr) addr_to_pn(addr)
+static inline int
+addr_to_pn(unsigned int addr){
+    return((addr & PAGE_FRAME) >> 12);
 }
 
 /*

@@ -33,8 +33,8 @@
 #include <spl.h>
 #include <spinlock.h>
 #include <current.h>
-#include <mips/tlb.h>
 #include <addrspace.h>
+#include <tlb.h>
 #include <vm.h>
 #include <proc.h>
 
@@ -137,7 +137,6 @@ void
 as_activate(void)
 {
         struct addrspace *as;
-        int i;        
 
         as = proc_getas();
         if (as == NULL) {
@@ -149,17 +148,12 @@ as_activate(void)
         }
 
         /* Disable interrupts and flush TLB */
-        int spl = splhigh();
-        for (i=0; i<NUM_TLB; i++) {
-                tlb_write(TLBHI_INVALID(i), TLBLO_INVALID(), i);
-        }
-        splx(spl);
+        flush_tlb();
 }
 
 void
 as_deactivate(void)
 {
-        int i;
         /*
          * Write this. For many designs it won't need to actually do
          * anything. See proc.c for an explanation of why it (might)
@@ -167,11 +161,7 @@ as_deactivate(void)
          */
 
         /* Disable interrupts and flush TLB */
-        int spl = splhigh();
-        for (i=0; i<NUM_TLB; i++) {
-                tlb_write(TLBHI_INVALID(i), TLBLO_INVALID(), i);
-        }
-        splx(spl);
+        flush_tlb();
 }
 
 /*
@@ -262,5 +252,21 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
         return 0;
 }
 
-
+/* region_type
+ * find what type of region a virtual address is from. returns -1 if the
+ * address isn't within any region.
+ */
+int region_type(struct addrspace *as, vaddr_t addr)
+{
+        struct region *c_region = as->regions;
+        int index = 1;
+        /* loop through all regions in addrspace */
+        while (c_region != NULL)
+        {
+                if (addr <= (c_region->start + c_region->size))
+                        return index;
+                c_region = c_region->next;
+        }
+        return -1;
+}
 

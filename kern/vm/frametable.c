@@ -84,7 +84,7 @@ vaddr_t alloc_kpages(unsigned int npages)
                 addr = ram_stealmem(npages);
                 spinlock_release(&stealmem_lock);
                 if(addr == 0) {
-                        return NULL;
+                        return 0;
                 }
                 return PADDR_TO_KVADDR(addr);
         } else {
@@ -93,14 +93,14 @@ vaddr_t alloc_kpages(unsigned int npages)
                 if (npages > 1){
                         kprintf("[*] alloc_kpages: error- wanted more than one frame\n");
                         /* can't alloc more than one page */
-                        return NULL;
+                        return 0;
                 }
                 spinlock_acquire(&stealmem_lock);
                 /* ensure we have enough memory to alloc */
                 if (cur_free == VM_INVALID_INDEX) {
                         kprintf("[*] alloc_kpages: error- no more free frames\n");
                         spinlock_release(&stealmem_lock);
-                        return NULL;
+                        return 0;
                 }
                 /* pop the next free frame */         
                 vaddr_t addr = pop_frame();

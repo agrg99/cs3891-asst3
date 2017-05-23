@@ -134,6 +134,9 @@ int               as_complete_load(struct addrspace *as);
 int               as_define_stack(struct addrspace *as, vaddr_t *initstackptr);
 
 
+int               region_type(struct addrspace *as, vaddr_t addr);
+
+
 /*
  * Functions in loadelf.c
  *    load_elf - load an ELF user program executable into the current
