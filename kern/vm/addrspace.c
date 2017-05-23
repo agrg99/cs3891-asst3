@@ -36,6 +36,7 @@
 #include <addrspace.h>
 #include <tlb.h>
 #include <vm.h>
+#include <mips/vm.h>
 #include <proc.h>
 
 /*
@@ -48,6 +49,10 @@
  *
  */
 
+static int
+append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size);
+
+
 struct addrspace *
 as_create(void)
 {
@@ -57,6 +62,8 @@ as_create(void)
         if (as == NULL) {
                 return NULL;
         }
+
+
 
         /* copied from dumbvm */
         /* just sets up and cleans the address space? */
@@ -121,6 +128,9 @@ as_copy(struct addrspace *old, struct addrspace **ret)
         return 0;
 }
 
+/* as_destroy
+ * destroys the addrspace
+ */
 void
 as_destroy(struct addrspace *as)
 {
@@ -130,15 +140,19 @@ as_destroy(struct addrspace *as)
          * called during `exit()`
          */
 
+        
+
         kfree(as);
 }
 
+
+/* as_activate
+ * flushes tlb
+ */
 void
 as_activate(void)
 {
-        struct addrspace *as;
-
-        as = proc_getas();
+        struct addrspace *as = proc_getas();
         if (as == NULL) {
                 /*
                  * Kernel thread without an address space; leave the
@@ -151,16 +165,21 @@ as_activate(void)
         flush_tlb();
 }
 
+/* as_deactivate
+ * flushes the tlb
+ */
 void
 as_deactivate(void)
 {
-        /*
-         * Write this. For many designs it won't need to actually do
-         * anything. See proc.c for an explanation of why it (might)
-         * be needed.
-         */
+        struct addrspace *as = proc_getas();
+        if (as == NULL) {
+                /*
+                 * Kernel thread without an address space; leave the
+                 * prior address space in place.
+                 */
+                return;
+        }
 
-        /* Disable interrupts and flush TLB */
         flush_tlb();
 }
 
@@ -189,33 +208,47 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
         return 0;
 }
 
+
+/* as_prepare_load
+ * store the old permissions and set the region permissions to be RW
+ */
 int
 as_prepare_load(struct addrspace *as)
 {
-        /* make all pages read/write */
+        struct region *regions = as->regions;
 
-        (void)as;
+        while(regions != NULL) {
+                regions->old_permissions = regions->permissions;
+                regions->permissions = 0x2;
+                regions = regions->next;
+        }
+
         return 0;
 }
 
+/* as_complete_load
+ * set the region permissions back to the old ones
+ */
 int
 as_complete_load(struct addrspace *as)
 {
-        /* enforce read only on all pages */
+        struct region *regions = as->regions;
+
+        while(regions != NULL) {
+                regions->permissions = regions->old_permissions;
+                regions = regions->next;
+        }
         
-        (void)as;
         return 0;
 }
 
+/* as_define_stack
+ * define the stack region within the addr space */
 int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
-        /*
-         * same as prepare region, as specific to stack
-         * and it returns the location of the stack pointer the code chose
-         */
-
-        (void)as;
+        /* alocate the stack region */
+        append_region(as, 0x2, USERSTACK - 16*PAGE_SIZE, 16 * PAGE_SIZE);
 
         /* Initial user-level stack pointer */
         *stackptr = USERSTACK;
@@ -226,7 +259,7 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 
 /* append_region
  * creates and appends a region to the current address space region list */
-int
+static int
 append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
 {
         struct region *n_region, *c_region;;

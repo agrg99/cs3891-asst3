@@ -70,10 +70,6 @@ struct region {
         struct region *next;        /* pointer to the next region */
 };
 
-/* append a region to an address space */
-int append_region(struct addrspace *as, int permissions, vaddr_t start,
-                size_t size);
-
 
 #include <vm.h>
 
@@ -132,7 +128,6 @@ int               as_define_region(struct addrspace *as,
 int               as_prepare_load(struct addrspace *as);
 int               as_complete_load(struct addrspace *as);
 int               as_define_stack(struct addrspace *as, vaddr_t *initstackptr);
-
 
 int               region_type(struct addrspace *as, vaddr_t addr);
 
