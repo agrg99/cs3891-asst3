@@ -35,8 +35,35 @@
  * Machine-dependent VM system definitions.
  */
 
-#define PAGE_SIZE  4096         /* size of VM page */
-#define PAGE_FRAME 0xfffff000   /* mask for getting page number from addr */
+#define PAGE_SIZE   4096        /* size of VM page */
+#define PAGE_FRAME  0xfffff000	/* mask for getting page number from addr */
+#define PAGE_PRES   0x1		/* mask for getting PPN from page entry */
+#define PAGE_PROT   0x6		/* mask for getting the protection bits */
+#define PAGE_MOD    0x8		/* mask for getting the modified bit */
+#define PAGE_REF    0x10	/* mask for getting the referenced bit */
+#define PAGE_CAD    0x20	/* mask for getting the cache disabled bit */
+
+#define PROT_RO	    0x2		/* read only perms */
+#define PROT_RW	    0x3		/* read write perms */
+
+/* mask and shift macro for ease of use */
+#define GET_PAGE_PRES(X)	X & PAGE_PRES		/* 'valid' bit */
+#define GET_PAGE_PROT(X)	(X & PAGE_PROT) >> 1	/* protections */
+#define GET_PAGE_MOD(X)		(X & PAGE_MOD) >> 3	/* 'dirty' bit */
+#define GET_PAGE_REF(X)		(X & PAGE_REF) >> 4	/* accessed? */
+#define GET_PAGE_CAD(X)		(X & PAGE_CAD) >> 5	/* bypass cache? */
+
+/* set certain flags */
+#define SET_PAGE_PRES(X)	X | PAGE_PRES		/* 'valid' bit */
+#define SET_PAGE_PROT(X, P)	X | P			/* protections */
+#define SET_PAGE_MOD(X)		X | PAGE_MOD		/* 'dirty' bit */
+#define SET_PAGE_REF(X)		X | PAGE_REF		/* accessed? */
+#define SET_PAGE_CAD(X)		X | PAGE_CAD		/* bypass cache? */
+
+#define SEG_CODE    1	/* identifier for code section */
+#define SEG_DATA    2	/* identifier for data section */
+#define SEG_HEAP    3	/* identifier for heap section */
+#define SEG_STACK   4	/* identifier for stack section */
 
 /*
  * MIPS-I hardwired memory layout:
@@ -75,6 +102,24 @@ paddr_to_kvaddr(paddr_t paddr){
 static inline paddr_t
 kvaddr_to_paddr(vaddr_t vaddr){
     return ((vaddr) - MIPS_KSEG0);
+}
+
+#define FINDEX_TO_KVADDR(int) findex_to_kvaddr(int)
+static inline vaddr_t
+findex_to_kvaddr(int index){
+    return(PADDR_TO_KVADDR(index << 12));
+}
+
+#define KVADDR_TO_FINDEX(vaddr) kvaddr_to_findex(vaddr)
+static inline int
+kvaddr_to_findex(vaddr_t vaddr){
+    return(KVADDR_TO_PADDR(vaddr) >> 12);
+}
+
+#define ADDR_TO_PN(addr) addr_to_pn(addr)
+static inline int
+addr_to_pn(unsigned int addr){
+    return((addr & PAGE_FRAME) >> 12);
 }
 
 /*
