@@ -34,14 +34,17 @@ void vm_bootstrap(void)
 
         /* create the page table */
         kprintf("time to setup page table\n");
-        hpt = (struct page_entry *)kmalloc(hpt_size * sizeof(struct page_entry));
+        kprintf("[*] vm_boostrap: hpt_size is %d\n", hpt_size);
+        kprintf("[*] vm_boostrap: hpt_entry size is %d\n", sizeof(struct page_entry));
+        kprintf("[*] vm_boostrap: total hpt size  %d pages\n", (hpt_size * sizeof(struct page_entry)) / PAGE_SIZE);
+
         int i;
         /* init the page table */
         for(i = 0; i < hpt_size; i++) {
-                hpt[i].pe_proc_id = VM_INVALID_INDEX;
-                hpt[i].pe_ppn   = VM_INVALID_INDEX;
-                hpt[i].pe_flags = VM_INVALID_INDEX;
-                hpt[i].pe_next  = VM_INVALID_INDEX;
+                hpt[i].pe_proc_id = 0;
+                hpt[i].pe_ppn   = 0;
+                hpt[i].pe_flags = 0;
+                hpt[i].pe_next  = 0;
         }
 }
 

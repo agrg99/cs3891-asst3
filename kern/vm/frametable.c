@@ -30,6 +30,11 @@ void frametable_init()
         /* calc size of the frame table */
         ft_size = n_pages * sizeof(struct frame_entry);
         kprintf("[*] Virtual Memory: size of ft is: 0x%x\n", (int)ft_size);
+ 
+        
+        /* allocate some space for the hpt when we need it */
+        hpt = (struct page_entry *)kmalloc(hpt_size * sizeof(struct page_entry));
+        
         /* allocate the frame table above the os */
         ft = (struct frame_entry *)kmalloc(ft_size);
 
