@@ -5,7 +5,9 @@
 #include <addrspace.h>
 #include <vm.h>
 #include <tlb.h>
+#include <mips/tlb.h>
 #include <proc.h>
+#include <current.h>
 
 /* define static methods */
 static uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr);
@@ -13,13 +15,11 @@ static struct page_entry * search_hpt(struct addrspace *as, vaddr_t addr);
 static struct page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr);
 static int hash_inc(uint32_t *pt_hash);
 
-/* define the hpt size to be used across different functions */
-int hpt_size;
-
 /* The following hash function will combine the address of the struct
  * addrspace and faultaddr address to reduce hash collisions between processes
  * (processes using similar address ranges). */
-static uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr)
+        static uint32_t
+hpt_hash(struct addrspace *as, vaddr_t faultaddr)
 {
         uint32_t index;
         index = (((uint32_t )as) ^ (faultaddr >> PAGE_BITS)) % hpt_size;
@@ -28,7 +28,8 @@ static uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr)
 
 /* bootstrap the frame and page table here. We can use kmalloc because 
  * alloc_kpages still uses the stealmem function. */
-void vm_bootstrap(void)
+        void 
+vm_bootstrap(void)
 {
         frametable_init();
 
@@ -38,7 +39,7 @@ void vm_bootstrap(void)
         kprintf("[*] vm_boostrap: hpt_entry size is %d\n", sizeof(struct page_entry));
         kprintf("[*] vm_boostrap: total hpt size  %d pages\n", (hpt_size * sizeof(struct page_entry)) / PAGE_SIZE);
 
-        int i;
+        unsigned int i;
         /* init the page table */
         for(i = 0; i < hpt_size; i++) {
                 hpt[i].pe_proc_id = 0;
@@ -58,38 +59,53 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         struct addrspace *as;
 
         /* fault if we tried to write to a readonly page */
-        if (faulttype == VM_FAULT_READONLY)
+        //       if (faulttype == VM_FAULT_READONLY)
+        //               return EFAULT;
+
+        if (curproc == NULL) {
                 return EFAULT;
+        }
+
+        (void) faulttype;
 
         as = proc_getas();
+        if (as == NULL) {
+                return EFAULT;
+        }
+
+        if (hpt == NULL) {
+                return EFAULT;
+        }
 
         /* get page entry */
         pe = search_hpt(as, faultaddress);
 
-        if (GET_PAGE_PRES(pe->pe_flags)) { /* if in frame table */
+        if (pe && GET_PAGE_PRES(pe->pe_flags)) { /* if in frame table */
                 //   pte->flag has pt_r?   |
                 //      return EFAULT;     |
                 //   else
-              /*  if GET_PAGE_MOD(pe->pe_flags) {
-                        //         load from swap
+                /*  if GET_PAGE_MOD(pe->pe_flags) {
+                //         load from swap
                 } else { 
-                        //         load from elf
+                //         load from elf
                 } */
-                
-        }
-        else { /* not in frame table */
-                if (region_type(as, faultaddress) == SEG_CODE) {
-                        //  load from elf
-                } else {
-                        //  allocate a zeroed page
-                        vaddr_t n_page = alloc_kpages(1);
-                        /* create and insert the page entry */
-                        pe = insert_hpt(as, n_page);
-                }
+
+        } else { /* not in frame table */
+                //    if (region_type(as, faultaddress) == SEG_CODE) {
+                //  load from elf
+                //return -1;
+                //    } else {
+                /* create and insert the page entry */
+                vaddr_t n_page = alloc_kpages(1);
+                pe = insert_hpt(as, n_page);
+                //   }
         }
 
+        /* mask the ppn ready for tlb store */
+        uint32_t ppn = (pe->pe_ppn << 12) & PAGE_FRAME;
+        ppn = ppn | TLBLO_VALID | TLBLO_DIRTY; /* set valid bit */ 
         pe->pe_flags = SET_PAGE_REF(pe->pe_flags);  /* set referenced */
-        insert_tlb(faultaddress, pe->pe_ppn);       /* load tlb */
+        insert_tlb(faultaddress, ppn);       /* load tlb */
 
         return 0;
 }
@@ -97,7 +113,8 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 /* hash_inc
  * increment the hash table hash index safely
  */
-static int hash_inc(uint32_t *pt_hash)
+        static int
+hash_inc(uint32_t *pt_hash)
 {
         /* wrap around end of list, and ensure empty spot 0 */
         *pt_hash = (*pt_hash + 1) % hpt_size;
@@ -111,7 +128,8 @@ static int hash_inc(uint32_t *pt_hash)
  * insert a page entry into the hpt, if the record exists then linear probing
  * is used to find an empty slot.
  */
-static struct page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr)
+        static struct
+page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr)
 {
         struct page_entry n_pe;
         uint32_t pt_hash;
@@ -161,10 +179,10 @@ static struct page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr)
  * search the page table for a vpn number, and return the physical page num
  * if found, otherwise return -1
  */
-static struct page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
+        static struct
+page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
 { 
-        uint32_t pt_hash, pid;
-        int vpn;
+        uint32_t pt_hash, pid, vpn;
 
         /* get the vpn from the address */
         vpn = ADDR_TO_PN(addr); 
@@ -179,7 +197,7 @@ static struct page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
         struct page_entry *pe = &hpt[pt_hash];
 
         /* loop the chain while we don't have an entry for this proc */
-        while(pe->pe_proc_id != pid && pe->pe_proc_id != 0) {
+        while((pe->pe_proc_id != pid && pe->pe_vpn != vpn) && pe->pe_proc_id != 0) {
                 pe = &hpt[pe->pe_next];
         }
 
@@ -192,6 +210,35 @@ static struct page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
         return pe;
 }
 
+/*
+ * purge_hpt
+ * purges all records in the hpt and then the records they refer to in the ft
+ * for the current addresspace - this is called when the process is ending
+ */
+        void
+purge_hpt(struct addrspace *as)
+{
+        unsigned int i,j;
+        for (i=1; i<hpt_size; i++) {
+                /* remove all entries to current as from frame table */
+                if (hpt[i].pe_proc_id == (uint32_t)as) {
+                        /* find the entry that references this one */
+                        for (j=1; j<hpt_size; j++){
+                                if(hpt[j].pe_next == i){
+                                        /* set its next to the real next */
+                                        hpt[j].pe_next = hpt[i].pe_next;
+                                        break;
+                                }
+                        }
+                        hpt[i].pe_proc_id = 0;
+                        hpt[i].pe_vpn = 0;
+                        hpt[i].pe_flags = 0;
+                        hpt[i].pe_next = 0;
+                        free_kpages(FINDEX_TO_KVADDR(hpt[i].pe_ppn));
+                        hpt[i].pe_ppn = 0;
+                }
+        }
+}
 
 /*
  *

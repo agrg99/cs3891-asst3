@@ -68,7 +68,7 @@ struct page_entry {
 struct page_entry *hpt;
 
 /* number of entries in the page table */
-int hpt_size;	
+unsigned int hpt_size;	
 
 /* the index for the top level free frame in the frame table */
 int cur_free;
@@ -83,6 +83,9 @@ void frametable_init(void);
 
 /* Fault handling function called by trap code */
 int vm_fault(int faulttype, vaddr_t faultaddress);
+
+/* purge hpt and ft for frames belonging to an as */
+void purge_hpt(struct addrspace *as);
 
 /* Allocate/free kernel heap pages (called by kmalloc/kfree) */
 vaddr_t alloc_kpages(unsigned npages);
