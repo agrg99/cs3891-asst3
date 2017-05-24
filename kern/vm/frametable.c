@@ -81,7 +81,6 @@ vaddr_t alloc_kpages(unsigned int npages)
 {
         /* check if the page table or frame table has not been allocated yet */
         if (!ft) {
-                kprintf("[*] alloc_kpages: using stealmem\n");
                 /* vm system not alive - use stealmem */
                 paddr_t addr;
                 spinlock_acquire(&stealmem_lock);
@@ -92,17 +91,14 @@ vaddr_t alloc_kpages(unsigned int npages)
                 }
                 return PADDR_TO_KVADDR(addr);
         } else {
-                kprintf("[*] alloc_kpages: using frames\n");
                 /* use my allocator as frame table is now initialised */
                 if (npages > 1){
-                        kprintf("[*] alloc_kpages: error- wanted more than one frame\n");
                         /* can't alloc more than one page */
                         return 0;
                 }
                 spinlock_acquire(&stealmem_lock);
                 /* ensure we have enough memory to alloc */
                 if (cur_free == VM_INVALID_INDEX) {
-                        kprintf("[*] alloc_kpages: error- no more free frames\n");
                         spinlock_release(&stealmem_lock);
                         return 0;
                 }
@@ -134,7 +130,6 @@ static vaddr_t pop_frame(void)
         vaddr_t addr = FINDEX_TO_KVADDR(c_index);       /* find the kvaddr */
         bzero((void *)addr, PAGE_SIZE);                 /* zero the frame */
 
-        kprintf("[*] allocated frame with kvaddr: %p\n", (void *)addr);
         return addr;
 }
 
@@ -150,7 +145,6 @@ static void push_frame(vaddr_t vaddr)
         ft[c_index].fe_used = 0;
         ft[c_index].fe_next = cur_free;
         cur_free = c_index;
-        kprintf("[*] freeded frame with kvaddr: %p\n", (void *)vaddr);
 }
 
 void free_kpages(vaddr_t addr)

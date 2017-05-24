@@ -64,6 +64,7 @@ as_create(void)
         }
 
 
+        as->regions = NULL;
 
         /* copied from dumbvm */
         /* just sets up and cleans the address space? */
@@ -134,13 +135,17 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 void
 as_destroy(struct addrspace *as)
 {
-        /*
-         * deallocate book keeping and page tables
-         * deallocate frames used
-         * called during `exit()`
-         */
-
+        /* purge the hpt and ft of all records for this AS */
+        purge_hpt(as);
         
+        /* free all regions */
+        struct region *c_region = as->regions;
+        struct region *n_region;
+        while (c_region) {
+                n_region = c_region->next;
+                kfree(c_region);
+                c_region = n_region;
+        }
 
         kfree(as);
 }
@@ -201,6 +206,8 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
         
         /* append a region to the address space */
         result = append_region(as, readable | writeable | executable, vaddr, memsize);
+ 
+	
         if(result) {
                 return result;
         }
@@ -247,7 +254,7 @@ as_complete_load(struct addrspace *as)
 int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
-        /* alocate the stack region */
+        /* allocate the stack region */
         append_region(as, 0x2, USERSTACK - 16*PAGE_SIZE, 16 * PAGE_SIZE);
 
         /* Initial user-level stack pointer */
@@ -267,15 +274,17 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
         n_region = kmalloc(sizeof(struct region));
         if (!n_region)
                 return EFAULT;
+        
         n_region->permissions = permissions;
         n_region->start = start;
         n_region->size = size;
+        n_region->next = NULL;
 
         /* append the new region to the end of the region list */
         c_region = as->regions;
-        if (c_region != NULL) {
-                while(c_region->next != NULL){
-                       c_region = c_region->next;
+        if (c_region) {
+                while(c_region->next){
+                        c_region = c_region->next;
                 }
                 c_region->next = n_region;
         } else {
