@@ -57,15 +57,14 @@ struct frame_entry *ft;
 
 /* layout of a page table entry */
 struct page_entry {
-	uint32_t	pe_vpn;						/* the vpn of the entry */
-	uint32_t	pe_proc_id;					/* the process id */
+	uint32_t	pe_proc;					/* the process id */
 	uint32_t	pe_ppn;						/* the frame table frame num */
 	char		pe_flags;					/* page permissions and flags */
-	uint32_t	pe_next;					/* pointer to collion next entry */
+	struct page_entry *pe_next;				/* pointer to collion next entry */
 };
 
 /* pointer to the hashed page table */
-struct page_entry *hpt;
+struct page_entry **hpt;
 
 /* number of entries in the page table */
 unsigned int hpt_size;	
