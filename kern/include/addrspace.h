@@ -63,8 +63,8 @@ struct addrspace {
 
 /* regions for sections in binary */
 struct region {
-        int permissions;            /* the permissions of the region */
-        int old_permissions;        /* the original permissions */
+        char cur_writebit;            /* the permissions of the region */
+        char old_writebit;           /* the original permissions */
         vaddr_t start;              /* virtual address where this lays */
         size_t size;                /* size of the region */
         struct region *next;        /* pointer to the next region */

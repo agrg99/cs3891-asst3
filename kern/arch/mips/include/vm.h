@@ -138,7 +138,8 @@ addr_to_pn(unsigned int addr){
  * We put the stack at the very top of user virtual memory because it
  * grows downwards.
  */
-#define USERSTACK     USERSPACETOP
+#define USERSTACK	    USERSPACETOP
+#define USERSTACK_SIZE	    16*PAGE_SIZE
 
 /*
  * Interface to the low-level module that looks after the amount of

@@ -8,10 +8,10 @@
 /* define static internal functions */
 static vaddr_t pop_frame(void);
 static void push_frame(vaddr_t vaddr);
-
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 
-void frametable_init()
+void
+frametable_init()
 {   
         paddr_t ram_sz, ft_top;
         size_t ft_size; 
@@ -30,10 +30,10 @@ void frametable_init()
         /* calc size of the frame table */
         ft_size = n_pages * sizeof(struct frame_entry);
         kprintf("[*] Virtual Memory: size of ft is: 0x%x\n", (int)ft_size);
- 
+
         /* allocate some space for the hpt when we need it */
-        hpt = (struct page_entry *)kmalloc(hpt_size * sizeof(struct page_entry));
-        
+        hpt = (struct page_entry **)kmalloc(hpt_size * sizeof(struct page_entry *));
+
         /* allocate the frame table above the os */
         ft = (struct frame_entry *)kmalloc(ft_size);
 
@@ -77,7 +77,8 @@ void frametable_init()
  * frame table initialisation function, or check to see if the
  * frame table has been initialised and call ram_stealmem() otherwise.
  */
-vaddr_t alloc_kpages(unsigned int npages)
+vaddr_t
+alloc_kpages(unsigned int npages)
 {
         /* check if the page table or frame table has not been allocated yet */
         if (!ft) {
@@ -112,7 +113,8 @@ vaddr_t alloc_kpages(unsigned int npages)
 /* pop_frame()
  * pops the next available frame from the freelist and returns the kvaddr
  */
-static vaddr_t pop_frame(void)
+static vaddr_t
+pop_frame(void)
 {
         int c_index = cur_free;
         /* if we are getting the last frame, deem the cur_free invalid */
@@ -136,7 +138,8 @@ static vaddr_t pop_frame(void)
 /* push_frame()
  * push a frame onto the freelist
  */
-static void push_frame(vaddr_t vaddr)
+static void
+push_frame(vaddr_t vaddr)
 {
         int c_index;
         c_index = KVADDR_TO_FINDEX(vaddr);
@@ -147,9 +150,12 @@ static void push_frame(vaddr_t vaddr)
         cur_free = c_index;
 }
 
-void free_kpages(vaddr_t addr)
+void
+free_kpages(vaddr_t addr)
 {
+        spinlock_acquire(&stealmem_lock);
         /* call static function to free */
         push_frame(addr);
+        spinlock_release(&stealmem_lock);
 }
 
