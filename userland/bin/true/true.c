@@ -29,28 +29,14 @@
 
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 
 /*
  * true - succeed.
  */
-void lol(void);
-
-void lol(){
-
-	puts("so");
-	puts("much");
-	//exit(0);
-}
 
 int
 main(void)
 {
-	puts("i");
-	puts("love");
-	puts("os\n");
-	lol();
-	//printf(":-(");
 	/* Just exit with success. */
 	exit(0);
 }

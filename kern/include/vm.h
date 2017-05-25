@@ -41,7 +41,7 @@
 #define VM_INVALID_INDEX	 -1	  /* invalid pointer index */
 
 #define PAGE_SIZE 4096	/* page size for hpt */
-#define PAGE_BITS 20	/* number of bits in vpn */
+#define PAGE_BITS 12	/* number of bits in offset */
 
 /* ------------------------------------------------------------------------- */
 

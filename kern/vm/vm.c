@@ -21,6 +21,7 @@ static struct page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr);
 hpt_hash(struct addrspace *as, vaddr_t faultaddr)
 {
         uint32_t index;
+        //kprintf("faultaddr >> PAGEBITS = %d\n", faultaddr >> PAGE_BITS);
         index = (((uint32_t )as) ^ (faultaddr >> PAGE_BITS)) % hpt_size;
         return index;
 }
@@ -68,10 +69,17 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 return EFAULT;
         }
 
+        /* check if request was to a valid region */
+        if (!region_type(as, faultaddress)){
+                return EFAULT;
+        }
+
         /* get page entry */
         pe = search_hpt(as, faultaddress);
 
-        if (pe && GET_PAGE_PRES(pe->pe_flags)) { /* if in frame table */
+        //kprintf("did we find pe? %d\n", (pe!=NULL) ? 1 : 0 );
+
+        if (pe){ // && GET_PAGE_PRES(pe->pe_flags)) { /* if in frame table */
                 //   pte->flag has pt_r?   |
                 //      return EFAULT;     |
                 //   else
@@ -92,7 +100,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         }
 
         /* mask the ppn ready for tlb store */
-        uint32_t ppn = (pe->pe_ppn << 12) & PAGE_FRAME;
+        uint32_t ppn = (uint32_t) PN_TO_ADDR(pe->pe_ppn);
+        //kprintf("vpn checked: %x\n", ADDR_TO_PN(faultaddress));
+        //kprintf("ppn inserted under: %x\n\n", pe->pe_ppn);
         ppn = ppn | TLBLO_VALID | TLBLO_DIRTY; /* set valid bit */ 
         pe->pe_flags = SET_PAGE_REF(pe->pe_flags);  /* set referenced */
         insert_tlb(faultaddress, ppn);       /* load tlb */
@@ -143,6 +153,9 @@ page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
 
         /* get the hash index for hpt */
         pt_hash = hpt_hash(as, addr);
+        
+        //kprintf("hashing addr: %x\n", addr);
+        //kprintf("hash used is: %d\n", pt_hash);
 
         /* get addrspace id (secretly the pointer to the addrspace) */
         proc = (uint32_t) as;

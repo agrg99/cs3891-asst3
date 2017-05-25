@@ -39,6 +39,10 @@
 #include <mips/vm.h>
 #include <proc.h>
 
+
+static int
+append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size);
+
 /*
  * Note! If OPT_DUMBVM is set, as is the case until you start the VM
  * assignment, this file is not compiled or linked or in any way
@@ -48,10 +52,6 @@
  * part of the VM subsystem.
  *
  */
-
-static int
-append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size);
-
 
     struct addrspace *
 as_create(void)
@@ -290,7 +290,7 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
 }
 
 /* region_type
- * find what type of region a virtual address is from. returns -1 if the
+ * find what type of region a virtual address is from. returns 0 if the
  * address isn't within any region.
  */
 int region_type(struct addrspace *as, vaddr_t addr)
@@ -300,10 +300,11 @@ int region_type(struct addrspace *as, vaddr_t addr)
     /* loop through all regions in addrspace */
     while (c_region != NULL)
     {
-        if (addr <= (c_region->start + c_region->size))
+        if ((addr >= c_region->start) && addr < (c_region->start + c_region->size))
             return index;
         c_region = c_region->next;
+        index++;
     }
-    return -1;
+    return 0;
 }
 
