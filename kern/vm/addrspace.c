@@ -106,7 +106,7 @@ kprintf("copyin AS...\n");
     /* duplicate frames and set the read only bit */
     duplicate_hpt(new, old);
 
-    //flush_tlb();
+    flush_tlb();
     /*
      * it is my understanding we need to loop through the page table and
      * look at each entry that corresponds to the old addresspace (lucky 
