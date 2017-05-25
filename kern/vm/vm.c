@@ -14,6 +14,8 @@ static uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr);
 static struct page_entry * search_hpt(struct addrspace *as, vaddr_t addr);
 static struct page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr);
 
+static struct spinlock spinny_lock = SPINLOCK_INITIALIZER;
+
 /* The following hash function will combine the address of the struct
  * addrspace and faultaddr address to reduce hash collisions between processes
  * (processes using similar address ranges). */
@@ -58,6 +60,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 case VM_FAULT_WRITE:
                         break;
                 case VM_FAULT_READONLY:
+                        panic("readonpmn;y\n");
                         return EFAULT;
                 default:
                         return EINVAL;
@@ -68,6 +71,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         if (!curproc || !hpt || !as) {
                 return EFAULT;
         }
+
+        if (faultaddress >=  0x80000000)
+                return EFAULT;
 
         /* check if request was to a valid region */
         if (!region_type(as, faultaddress)){
@@ -119,6 +125,7 @@ page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr)
 {
         vaddr_t n_frame = alloc_kpages(1);
         struct page_entry *n_pe = kmalloc(sizeof(struct page_entry));
+        uint32_t vpn = ADDR_TO_PN(n_frame);
         uint32_t ppn = ADDR_TO_PN(KVADDR_TO_PADDR(n_frame));
         uint32_t pt_hash = hpt_hash(as, vaddr);
         struct page_entry *pe = hpt[pt_hash];
@@ -126,7 +133,9 @@ page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr)
         /* set up new page */
         n_pe->pe_proc = (uint32_t) as;
         n_pe->pe_ppn = ppn;
-        n_pe->pe_flags = SET_PAGE_PROT(0, PROT_RW);
+        n_pe->pe_vpn = vpn;
+        
+        n_pe->pe_flags = SET_PAGE_PROT(0, region_perms(as, vaddr));
         n_pe->pe_flags = SET_PAGE_PRES(n_pe->pe_flags);
         n_pe->pe_next = NULL;
         /* check if this record is taken */
@@ -149,8 +158,8 @@ page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr)
         static struct
 page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
 { 
-        uint32_t pt_hash, proc;
-
+        uint32_t pt_hash, proc, vpn;
+                
         /* get the hash index for hpt */
         pt_hash = hpt_hash(as, addr);
         
@@ -160,11 +169,14 @@ page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
         /* get addrspace id (secretly the pointer to the addrspace) */
         proc = (uint32_t) as;
 
+        /* declare the vpn */
+        vpn = ADDR_TO_PN(addr);
+
         /* get the page table entry */
         struct page_entry *pe = hpt[pt_hash];
 
         /* loop the chain while we don't have an entry for this proc */
-        while(pe != NULL && pe->pe_proc != proc) {
+        while(pe != NULL && pe->pe_proc != proc && pe->pe_vpn != vpn) {
                 pe = pe->pe_next;
         }
 
@@ -185,23 +197,69 @@ page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
         void
 purge_hpt(struct addrspace *as)
 {
+        kprintf("purging hpt\n");
         unsigned int i;
         uint32_t proc = (uint32_t) as;
-        struct page_entry *c_pe, *p_pe;
+        struct page_entry *c_pe, *n_pe, *t_pe;
+        spinlock_acquire(&spinny_lock);
         for (i=0; i < hpt_size; i++) {
-                p_pe = c_pe = hpt[i];
-                if (c_pe != NULL) {
-                        while (c_pe != NULL && c_pe->pe_proc != proc) {
-                                p_pe = c_pe;
-                                c_pe = c_pe->pe_next;
-                        }
-                        if (c_pe != NULL) {
-                                p_pe->pe_next = c_pe->pe_next;
+                n_pe = c_pe = hpt[i];
+                if (!c_pe)
+                        continue;
+                while (c_pe != NULL) {
+                        t_pe = c_pe->pe_next;
+                        if (c_pe->pe_proc == proc) {
                                 free_kpages(FINDEX_TO_KVADDR(c_pe->pe_ppn));
                                 kfree(c_pe);
+                        } 
+                        if (hpt[i] == c_pe) { 
+                                hpt[i] = t_pe;
+                        } else {
+                                n_pe->pe_next = t_pe;
                         }
+                        n_pe = t_pe;
+                        c_pe = (t_pe) ? t_pe->pe_next : NULL;
                 }
         }
+        spinlock_release(&spinny_lock);
+}
+
+
+/* duplicate_hpt
+ * duplicates all entries for the old addrspace for the new one and sets all
+ * pages to read only
+ */
+void
+duplicate_hpt(struct addrspace *new, struct addrspace *old)
+{
+        kprintf("duplicating hpt\n");
+        uint32_t n_proc = (uint32_t) new;
+        uint32_t o_proc = (uint32_t) old;
+        struct page_entry *pe;
+        struct page_entry *n_pe;
+        unsigned int i;
+        
+        spinlock_acquire(&spinny_lock);
+        for (i=0; i < hpt_size; i++) {
+                pe = hpt[i];
+                while (pe != NULL) {
+                        /* if we find a matching record, duplicate & insert */
+                        if (pe->pe_proc == o_proc) {
+                                n_pe = kmalloc(sizeof(struct page_entry));   
+                                *n_pe = *pe;
+                                n_pe->pe_proc = n_proc;
+                                n_pe->pe_next = pe->pe_next;
+                                pe->pe_next = n_pe;
+                                /* disable write bit */
+                               // n_pe->pe_flags = SET_PAGE_NOWRITE(n_pe->pe_flags);
+                               // pe->pe_flags = SET_PAGE_NOWRITE(pe->pe_flags);
+                                /* increment refcount on frame */
+                                ft[pe->pe_ppn].fe_refcount++;
+                        }
+                        pe = pe->pe_next;
+                }
+        }
+        spinlock_release(&spinny_lock);
 }
 
 /*
