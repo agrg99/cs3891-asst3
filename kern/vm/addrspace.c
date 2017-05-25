@@ -57,6 +57,7 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
 as_create(void)
 {
     struct addrspace *as;
+kprintf("creating AS...\n");
 
     as = kmalloc(sizeof(struct addrspace));
     if (as == NULL) {
@@ -79,7 +80,33 @@ as_copy(struct addrspace *old, struct addrspace **ret)
        - copy contents from source frame to dest frame
        - add PT entry for dest
        */
-panic("tried to as_copy\n");
+
+kprintf("copyin AS...\n");
+
+    struct addrspace *new = as_create();
+    if (new==NULL) {
+        return ENOMEM;
+    }
+
+    /* copy over all regions */
+    struct region *region = old->regions;
+    struct region *t_region, *n_region;
+    n_region = kmalloc(sizeof(struct region));
+    *n_region = *region;
+    new->regions = n_region;
+    while (region != NULL) {
+        t_region = kmalloc(sizeof(struct region));
+        *t_region = *region;
+        t_region->next = NULL;
+        n_region->next = t_region;
+        n_region = t_region;
+        region = region->next;
+    }
+
+    /* duplicate frames and set the read only bit */
+    duplicate_hpt(new, old);
+
+    flush_tlb();
     /*
      * it is my understanding we need to loop through the page table and
      * look at each entry that corresponds to the old addresspace (lucky 
@@ -95,12 +122,7 @@ panic("tried to as_copy\n");
      * frame number for the page entry of the address space doing the write
      */
 
-    struct addrspace *newas;
 
-    newas = as_create();
-    if (newas==NULL) {
-        return ENOMEM;
-    }
 
     /* set the pages and bases the same? copied from dumvm */
     //new->as_vbase1 = old->as_vbase1;
@@ -108,9 +130,7 @@ panic("tried to as_copy\n");
     //new->as_vbase2 = old->as_vbase2;
     //new->as_npages2 = old->as_npages2;
 
-    (void)old;
-
-    *ret = newas;
+    *ret = new;
     return 0;
 }
 
@@ -120,19 +140,24 @@ panic("tried to as_copy\n");
     void
 as_destroy(struct addrspace *as)
 {
+
+kprintf("purging AS...\n");
+
     /* purge the hpt and ft of all records for this AS */
     purge_hpt(as);
 
     /* free all regions */
     struct region *c_region = as->regions;
     struct region *n_region;
-    while (c_region) {
+    while (c_region != NULL) {
         n_region = c_region->next;
         kfree(c_region);
         c_region = n_region;
     }
 
     kfree(as);
+
+    flush_tlb();
 }
 
 
@@ -214,8 +239,8 @@ as_prepare_load(struct addrspace *as)
 {
     struct region *regions = as->regions;
     while(regions != NULL) {
-        regions->old_writebit = regions->cur_writebit;
-        regions->cur_writebit = 1;
+        regions->old_perms = regions->cur_perms;
+        regions->cur_perms = 0x7; // RWX
         regions = regions->next;
     }
     return 0;
@@ -229,7 +254,7 @@ as_complete_load(struct addrspace *as)
 {
     struct region *regions = as->regions;
     while(regions != NULL) {
-        regions->cur_writebit = regions->old_writebit;
+        regions->cur_perms = regions->old_perms;
         regions = regions->next;
     }
     /* flush read only sections out */
@@ -244,10 +269,18 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
     int result;
     /* allocate the stack region */
-    result = as_define_region(as, USERSTACK - USERSTACK_SIZE, USERSTACK_SIZE, 1, 1, 1);
+    result = as_define_region(as, USERSTACK, USERSTACK_SIZE, 1, 1, 1);
     if (result) {
         return result;
     }
+
+    /* set is stack for stack region */
+    struct region *c_re = as->regions;
+    while (c_re->next != NULL) {
+        c_re = c_re->next;
+    }
+    c_re->is_stack = 1;
+
 
     /* Initial user-level stack pointer */
     *stackptr = USERSTACK;
@@ -267,11 +300,11 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
     if (!n_region)
         return EFAULT;
 
-    n_region->old_writebit = (permissions & 0x2) >> 1;
-    n_region->cur_writebit = (permissions & 0x2) >> 1;
+    n_region->cur_perms = permissions;
     n_region->start = start;
     n_region->size = size;
     n_region->next = NULL;
+    n_region->is_stack = 0;
 
     /* append the new region to where it fits in the region list */
     t_region = c_region = as->regions;
@@ -300,6 +333,13 @@ int region_type(struct addrspace *as, vaddr_t addr)
     /* loop through all regions in addrspace */
     while (c_region != NULL)
     {
+        /* check for the stack */
+        if (c_region->is_stack) {
+            if ((addr < c_region->start) && addr > (c_region->start - c_region->size))
+                return SEG_STACK;
+            else
+                return 0;
+        }
         if ((addr >= c_region->start) && addr < (c_region->start + c_region->size))
             return index;
         c_region = c_region->next;
@@ -308,3 +348,24 @@ int region_type(struct addrspace *as, vaddr_t addr)
     return 0;
 }
 
+/* region_perms
+ * find the permissions of a region
+ */
+int region_perms(struct addrspace *as, vaddr_t addr)
+{
+    struct region *c_region = as->regions;
+    /* loop through all regions in addrspace */
+    while (c_region != NULL)
+    {
+        if (c_region->is_stack) {
+            if ((addr < c_region->start) && addr > (c_region->start - c_region->size))
+                return c_region->cur_perms;
+            else
+                return -1;
+        }
+        if ((addr >= c_region->start) && addr < (c_region->start + c_region->size))
+            return c_region->cur_perms;
+        c_region = c_region->next;
+    }
+    return -1;
+}
