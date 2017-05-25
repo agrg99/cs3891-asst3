@@ -29,6 +29,7 @@
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /*
  * true - succeed.
@@ -38,6 +39,13 @@ int
 main(void)
 {
 	/* Just exit with success. */
-	fork();
-	exit(0);
+	int a = fork();
+	if (a == 0){
+
+		exit(0);
+		puts(" i am the child!");
+	} else {
+
+		exit(0);
+	}
 }
