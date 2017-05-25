@@ -38,5 +38,6 @@ int
 main(void)
 {
 	/* Just exit with success. */
+	fork();
 	exit(0);
 }

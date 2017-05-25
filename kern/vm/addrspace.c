@@ -106,7 +106,7 @@ kprintf("copyin AS...\n");
     /* duplicate frames and set the read only bit */
     duplicate_hpt(new, old);
 
-    flush_tlb();
+    //flush_tlb();
     /*
      * it is my understanding we need to loop through the page table and
      * look at each entry that corresponds to the old addresspace (lucky 
@@ -125,7 +125,7 @@ kprintf("copyin AS...\n");
 
 
     /* set the pages and bases the same? copied from dumvm */
-    //new->as_vbase1 = old->as_vbase1;
+    //new->as_vbase1 = oldas_vbase1;
     //new->as_npages1 = old->as_npages1;
     //new->as_vbase2 = old->as_vbase2;
     //new->as_npages2 = old->as_npages2;
@@ -157,7 +157,7 @@ kprintf("purging AS...\n");
 
     kfree(as);
 
-    flush_tlb();
+   // flush_tlb();
 }
 
 
@@ -222,6 +222,8 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
 
     int permissions = (readable << 2 | writeable << 1 | executable); 
 
+    kprintf("defining a region with base %x and top %x\n", vaddr, vaddr+memsize);
+    
     /* append a region to the address space */
     result = append_region(as, permissions, vaddr, memsize);
     if (result) {
