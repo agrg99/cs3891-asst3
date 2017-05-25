@@ -5,6 +5,7 @@
 #include <addrspace.h>
 #include <vm.h>
 #include <tlb.h>
+#include <spl.h>
 #include <mips/tlb.h>
 #include <proc.h>
 #include <current.h>
@@ -52,6 +53,7 @@ vm_bootstrap(void)
         int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
+        int spl;
         struct page_entry *pe;
         struct addrspace *as;
 
@@ -78,11 +80,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         }
 
         /* get page entry */
-      //  spinlock_acquire(&spinny_lock);
+        spl = splhigh();
         pe = search_hpt(as, faultaddress);
-      //  spinlock_release(&spinny_lock);
-        //kprintf("did we find pe? %d\n", (pe!=NULL) ? 1 : 0 );
-
+        splx(spl);
+        
         if (pe){ // && GET_PAGE_PRES(pe->pe_flags)) { /* if in frame table */
                 //   pte->flag has pt_r?   |
                 //      return EFAULT;     |
@@ -100,8 +101,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 //    } else {
                 /* create and insert the page entry */
         //        spinlock_acquire(&spinny_lock);
+        spl = splhigh();
                 pe = insert_hpt(as, faultaddress);
           //      spinlock_release(&spinny_lock);
+        splx(spl);
                 //   }
         }
 
@@ -212,9 +215,9 @@ page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
         void
 purge_hpt(struct addrspace *as)
 {
-        kprintf("purging hpt\n");
         unsigned int i;
         uint32_t proc = (uint32_t) as;
+        kprintf("purging hpt: %x\n", proc);
         struct page_entry *c_pe, *n_pe;
         spinlock_acquire(&spinny_lock);
         for (i=0; i < hpt_size; i++) {
@@ -224,6 +227,7 @@ purge_hpt(struct addrspace *as)
                 while (c_pe->pe_next != NULL) {
                         c_pe = n_pe->pe_next;
                         if (c_pe->pe_proc == proc) {
+                                kprintf("purging %x for %x\n", (unsigned int)c_pe->pe_vpn, proc);
                                 n_pe->pe_next = c_pe->pe_next;
                                 free_kpages(FINDEX_TO_KVADDR(c_pe->pe_ppn));
                                 kfree(c_pe);
@@ -260,7 +264,6 @@ duplicate_hpt(struct addrspace *new, struct addrspace *old)
                         /* if we find a matching record, duplicate & insert */
                         n_pe = pe;
                         if (pe->pe_proc == o_proc) {
-                                kprintf("dup'd frame at row:%d, oldas:%x, newas:%x, with vpn:%x to now have fe_refcount:%d\n", i, o_proc, n_proc, pe->pe_vpn, ft[pe->pe_ppn].fe_refcount + 1);
                                 n_pe = kmalloc(sizeof(struct page_entry));   
                                 *n_pe = *pe;
                                 n_pe->pe_proc = n_proc;
@@ -275,6 +278,7 @@ duplicate_hpt(struct addrspace *new, struct addrspace *old)
                                 n_pe->pe_ppn = ADDR_TO_PN(KVADDR_TO_PADDR(nep));
                                 memcpy((void *)nep, (void *)PADDR_TO_KVADDR(PN_TO_ADDR(pe->pe_ppn)), 4096);
 
+                                kprintf("dup'd frame at row:%d, oldas:%x, newas:%x, with procid:%x, vpn:%x and ppn:%x to now have fe_refcount:%d and n_pe->vpn:%x and n_pe->ppn:%x\n", i, o_proc, n_proc, pe->pe_proc, pe->pe_vpn, pe->pe_ppn, ft[pe->pe_ppn].fe_refcount, n_pe->pe_vpn, n_pe->pe_ppn);
                                 //ft[pe->pe_ppn].fe_refcount++;
                         }
                         pe = n_pe->pe_next;
