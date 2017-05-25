@@ -62,8 +62,8 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 case VM_FAULT_READONLY:
                         panic("readonpmn;y\n");
                         //return EFAULT;
-                //default:
-                       // return EINVAL;
+                default:
+                       return EINVAL;
         }
 
         /* get as then do sanity check */
@@ -78,9 +78,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         }
 
         /* get page entry */
-        spinlock_acquire(&spinny_lock);
+      //  spinlock_acquire(&spinny_lock);
         pe = search_hpt(as, faultaddress);
-        spinlock_release(&spinny_lock);
+      //  spinlock_release(&spinny_lock);
         //kprintf("did we find pe? %d\n", (pe!=NULL) ? 1 : 0 );
 
         if (pe){ // && GET_PAGE_PRES(pe->pe_flags)) { /* if in frame table */
@@ -99,9 +99,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 //return -1;
                 //    } else {
                 /* create and insert the page entry */
-                spinlock_acquire(&spinny_lock);
+        //        spinlock_acquire(&spinny_lock);
                 pe = insert_hpt(as, faultaddress);
-                spinlock_release(&spinny_lock);
+          //      spinlock_release(&spinny_lock);
                 //   }
         }
 
@@ -110,7 +110,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         //kprintf("vpn checked: %x\n", ADDR_TO_PN(faultaddress));
         //kprintf("ppn inserted under: %x\n\n", pe->pe_ppn);
         ppn = ppn | TLBLO_VALID | TLBLO_DIRTY; /* set valid bit */ 
-        pe->pe_flags = SET_PAGE_REF(pe->pe_flags);  /* set referenced */
+        //pe->pe_flags = SET_PAGE_REF(pe->pe_flags);  /* set referenced */
         insert_tlb(faultaddress, ppn);       /* load tlb */
 
         return 0;
@@ -215,25 +215,24 @@ purge_hpt(struct addrspace *as)
         kprintf("purging hpt\n");
         unsigned int i;
         uint32_t proc = (uint32_t) as;
-        struct page_entry *c_pe, *n_pe, *t_pe;
+        struct page_entry *c_pe, *n_pe;
         spinlock_acquire(&spinny_lock);
         for (i=0; i < hpt_size; i++) {
                 n_pe = c_pe = hpt[i];
                 if (!c_pe)
                         continue;
-                while (c_pe != NULL) {
-                        t_pe = c_pe->pe_next;
+                while (c_pe->pe_next != NULL) {
+                        c_pe = n_pe->pe_next;
                         if (c_pe->pe_proc == proc) {
+                                n_pe->pe_next = c_pe->pe_next;
                                 free_kpages(FINDEX_TO_KVADDR(c_pe->pe_ppn));
                                 kfree(c_pe);
-                        } 
-                        if (hpt[i] == c_pe) { 
-                                hpt[i] = t_pe;
+                                c_pe = n_pe->pe_next;
                         } else {
-                                n_pe->pe_next = t_pe;
+                                n_pe = c_pe;
                         }
-                        n_pe = t_pe;
-                        c_pe = (t_pe) ? t_pe->pe_next : NULL;
+                        if (!c_pe)
+                                break;
                 }
         }
         spinlock_release(&spinny_lock);
@@ -261,7 +260,7 @@ duplicate_hpt(struct addrspace *new, struct addrspace *old)
                         /* if we find a matching record, duplicate & insert */
                         n_pe = pe;
                         if (pe->pe_proc == o_proc) {
-                                kprintf("dup'd frame at row:%d with vpn:%x to now have fe_refcount:%d\n", i, pe->pe_vpn, ft[pe->pe_ppn].fe_refcount + 1);
+                                kprintf("dup'd frame at row:%d, oldas:%x, newas:%x, with vpn:%x to now have fe_refcount:%d\n", i, o_proc, n_proc, pe->pe_vpn, ft[pe->pe_ppn].fe_refcount + 1);
                                 n_pe = kmalloc(sizeof(struct page_entry));   
                                 *n_pe = *pe;
                                 n_pe->pe_proc = n_proc;

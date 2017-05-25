@@ -245,6 +245,8 @@ as_prepare_load(struct addrspace *as)
         regions->cur_perms = 0x7; // RWX
         regions = regions->next;
     }
+
+    flush_tlb();
     return 0;
 }
 
