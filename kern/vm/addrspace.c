@@ -39,6 +39,10 @@
 #include <mips/vm.h>
 #include <proc.h>
 
+
+static int
+append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size);
+
 /*
  * Note! If OPT_DUMBVM is set, as is the case until you start the VM
  * assignment, this file is not compiled or linked or in any way
@@ -49,138 +53,124 @@
  *
  */
 
-static int
-append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size);
-
-
-struct addrspace *
+    struct addrspace *
 as_create(void)
 {
-        struct addrspace *as;
+    struct addrspace *as;
 
-        as = kmalloc(sizeof(struct addrspace));
-        if (as == NULL) {
-                return NULL;
-        }
+    as = kmalloc(sizeof(struct addrspace));
+    if (as == NULL) {
+        return NULL;
+    }
 
+    as->regions = NULL;
 
-
-        /* copied from dumbvm */
-        /* just sets up and cleans the address space? */
-        //as->as_vbase1 = 0;
-        //as->as_pbase1 = 0;
-        //as->as_npages1 = 0;
-        //as->as_vbase2 = 0;
-        //as->as_pbase2 = 0;
-        //as->as_npages2 = 0;
-        //as->as_stackpbase = 0;
-
-        /*
-         * Initialize as needed.
-         */
-
-        return as;
+    return as;
 }
 
-int
+    int
 as_copy(struct addrspace *old, struct addrspace **ret)
 {
-        /*
-        - allocates a new destination addr space
-        - adds all the same regions as source
-        - roughly, for each mapped page in source
-          - allocate a frame in dest
-          - copy contents from source frame to dest frame
-          - add PT entry for dest
-        */
+    /*
+       - allocates a new destination addr space
+       - adds all the same regions as source
+       - roughly, for each mapped page in source
+       - allocate a frame in dest
+       - copy contents from source frame to dest frame
+       - add PT entry for dest
+       */
+panic("tried to as_copy\n");
+    /*
+     * it is my understanding we need to loop through the page table and
+     * look at each entry that corresponds to the old addresspace (lucky 
+     * we used the pointer as the process Identifier) and copy all the 
+     * entries to use for the new address space (using the new addrspace 
+     * pointer as the identifier lol) but have them point to the same
+     * physical frame - changing both address spaces to have all pages
+     * as read only. on write to a page that is NOW read only then the frame 
+     * is duplicated for the process that tried to write to it 
+     *
+     * this is why we need to keep a refcount with the frame - if it is
+     * more than one then we need to duplicate the frame and change the 
+     * frame number for the page entry of the address space doing the write
+     */
 
-        /*
-         * it is my understanding we need to loop through the page table and
-         * look at each entry that corresponds to the old addresspace (lucky 
-         * we used the pointer as the process Identifier) and copy all the 
-         * entries to use for the new address space (using the new addrspace 
-         * pointer as the identifier lol) but have them point to the same
-         * physical frame - changing both address spaces to have all pages
-         * as read only. on write to a page that is NOW read only then the frame 
-         * is duplicated for the process that tried to write to it 
-         *
-         * this is why we need to keep a refcount with the frame - if it is
-         * more than one then we need to duplicate the frame and change the 
-         * frame number for the page entry of the address space doing the write
-         */
+    struct addrspace *newas;
 
-        struct addrspace *newas;
+    newas = as_create();
+    if (newas==NULL) {
+        return ENOMEM;
+    }
 
-        newas = as_create();
-        if (newas==NULL) {
-                return ENOMEM;
-        }
+    /* set the pages and bases the same? copied from dumvm */
+    //new->as_vbase1 = old->as_vbase1;
+    //new->as_npages1 = old->as_npages1;
+    //new->as_vbase2 = old->as_vbase2;
+    //new->as_npages2 = old->as_npages2;
 
-        /* set the pages and bases the same? copied from dumvm */
-        //new->as_vbase1 = old->as_vbase1;
-        //new->as_npages1 = old->as_npages1;
-        //new->as_vbase2 = old->as_vbase2;
-        //new->as_npages2 = old->as_npages2;
+    (void)old;
 
-        (void)old;
-
-        *ret = newas;
-        return 0;
+    *ret = newas;
+    return 0;
 }
 
 /* as_destroy
  * destroys the addrspace
  */
-void
+    void
 as_destroy(struct addrspace *as)
 {
-        /*
-         * deallocate book keeping and page tables
-         * deallocate frames used
-         * called during `exit()`
-         */
+    /* purge the hpt and ft of all records for this AS */
+    purge_hpt(as);
 
-        
+    /* free all regions */
+    struct region *c_region = as->regions;
+    struct region *n_region;
+    while (c_region) {
+        n_region = c_region->next;
+        kfree(c_region);
+        c_region = n_region;
+    }
 
-        kfree(as);
+    kfree(as);
 }
 
 
 /* as_activate
  * flushes tlb
  */
-void
+    void
 as_activate(void)
 {
-        struct addrspace *as = proc_getas();
-        if (as == NULL) {
-                /*
-                 * Kernel thread without an address space; leave the
-                 * prior address space in place.
-                 */
-                return;
-        }
+    struct addrspace *as = proc_getas();
+    if (as == NULL) {
+        /*
+         * Kernel thread without an address space; leave the
+         * prior address space in place.
+         */
+        return;
+    }
 
-        /* Disable interrupts and flush TLB */
-        flush_tlb();
+    /* Disable interrupts and flush TLB */
+    flush_tlb();
 }
 
 /* as_deactivate
  * flushes the tlb
  */
-void
+    void
 as_deactivate(void)
 {
-        struct addrspace *as = proc_getas();
-        if (as == NULL) {
-                /*
-                 * Kernel thread without an address space; leave the
-                 * prior address space in place.
-                 */
-                return;
-        }
+    struct addrspace *as = proc_getas();
+    if (as == NULL) {
+        /*
+         * Kernel thread without an address space; leave the
+         * prior address space in place.
+         */
+        return;
+    }
 
-        flush_tlb();
+    flush_tlb();
 }
 
 /*
@@ -193,113 +183,128 @@ as_deactivate(void)
  * moment, these are ignored. When you write the VM system, you may
  * want to implement them.
  */
-int
+    int
 as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
-                 int readable, int writeable, int executable)
+        int readable, int writeable, int executable)
 {
-        int result;
-        
-        /* append a region to the address space */
-        result = append_region(as, readable | writeable | executable, vaddr, memsize);
-        if(result) {
-                return result;
-        }
+    int result;
 
-        return 0;
+    /* Align the region. First, the base... */
+    memsize += vaddr & ~(vaddr_t)PAGE_FRAME;
+    vaddr &= PAGE_FRAME;
+    /* ...and now the length. */
+    memsize = (memsize + PAGE_SIZE - 1) & PAGE_FRAME;
+
+    int permissions = (readable << 2 | writeable << 1 | executable); 
+
+    /* append a region to the address space */
+    result = append_region(as, permissions, vaddr, memsize);
+    if (result) {
+        return result;
+    }
+
+    return 0;
 }
-
 
 /* as_prepare_load
  * store the old permissions and set the region permissions to be RW
  */
-int
+    int
 as_prepare_load(struct addrspace *as)
 {
-        struct region *regions = as->regions;
-
-        while(regions != NULL) {
-                regions->old_permissions = regions->permissions;
-                regions->permissions = 0x2;
-                regions = regions->next;
-        }
-
-        return 0;
+    struct region *regions = as->regions;
+    while(regions != NULL) {
+        regions->old_writebit = regions->cur_writebit;
+        regions->cur_writebit = 1;
+        regions = regions->next;
+    }
+    return 0;
 }
 
 /* as_complete_load
  * set the region permissions back to the old ones
  */
-int
+    int
 as_complete_load(struct addrspace *as)
 {
-        struct region *regions = as->regions;
-
-        while(regions != NULL) {
-                regions->permissions = regions->old_permissions;
-                regions = regions->next;
-        }
-        
-        return 0;
+    struct region *regions = as->regions;
+    while(regions != NULL) {
+        regions->cur_writebit = regions->old_writebit;
+        regions = regions->next;
+    }
+    /* flush read only sections out */
+    flush_tlb();
+    return 0;
 }
 
 /* as_define_stack
  * define the stack region within the addr space */
-int
+    int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
-        /* alocate the stack region */
-        append_region(as, 0x2, USERSTACK - 16*PAGE_SIZE, 16 * PAGE_SIZE);
+    int result;
+    /* allocate the stack region */
+    result = as_define_region(as, USERSTACK - USERSTACK_SIZE, USERSTACK_SIZE, 1, 1, 1);
+    if (result) {
+        return result;
+    }
 
-        /* Initial user-level stack pointer */
-        *stackptr = USERSTACK;
+    /* Initial user-level stack pointer */
+    *stackptr = USERSTACK;
 
-        return 0;
+    return 0;
 }
 
 
 /* append_region
  * creates and appends a region to the current address space region list */
-static int
+    static int
 append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
 {
-        struct region *n_region, *c_region;;
+    struct region *n_region, *c_region, *t_region;
 
-        n_region = kmalloc(sizeof(struct region));
-        if (!n_region)
-                return EFAULT;
-        n_region->permissions = permissions;
-        n_region->start = start;
-        n_region->size = size;
+    n_region = kmalloc(sizeof(struct region));
+    if (!n_region)
+        return EFAULT;
 
-        /* append the new region to the end of the region list */
-        c_region = as->regions;
-        if (c_region != NULL) {
-                while(c_region->next != NULL){
-                       c_region = c_region->next;
-                }
-                c_region->next = n_region;
-        } else {
-                as->regions = n_region;
+    n_region->old_writebit = (permissions & 0x2) >> 1;
+    n_region->cur_writebit = (permissions & 0x2) >> 1;
+    n_region->start = start;
+    n_region->size = size;
+    n_region->next = NULL;
+
+    /* append the new region to where it fits in the region list */
+    t_region = c_region = as->regions;
+    if (c_region) {
+        while(c_region && c_region->start < n_region->start){
+            t_region = c_region;
+            c_region = c_region->next;
         }
+        t_region->next = n_region;
+        n_region->next = c_region;
+    } else {
+        as->regions = n_region;
+    }
 
-        return 0;
+    return 0;
 }
 
 /* region_type
- * find what type of region a virtual address is from. returns -1 if the
+ * find what type of region a virtual address is from. returns 0 if the
  * address isn't within any region.
  */
 int region_type(struct addrspace *as, vaddr_t addr)
 {
-        struct region *c_region = as->regions;
-        int index = 1;
-        /* loop through all regions in addrspace */
-        while (c_region != NULL)
-        {
-                if (addr <= (c_region->start + c_region->size))
-                        return index;
-                c_region = c_region->next;
-        }
-        return -1;
+    struct region *c_region = as->regions;
+    int index = 1;
+    /* loop through all regions in addrspace */
+    while (c_region != NULL)
+    {
+        if ((addr >= c_region->start) && addr < (c_region->start + c_region->size))
+            return index;
+        c_region = c_region->next;
+        index++;
+    }
+    return 0;
 }
 

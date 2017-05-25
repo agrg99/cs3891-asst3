@@ -41,7 +41,7 @@
 #define VM_INVALID_INDEX	 -1	  /* invalid pointer index */
 
 #define PAGE_SIZE 4096	/* page size for hpt */
-#define PAGE_BITS 20	/* number of bits in vpn */
+#define PAGE_BITS 12	/* number of bits in offset */
 
 /* ------------------------------------------------------------------------- */
 
@@ -57,18 +57,17 @@ struct frame_entry *ft;
 
 /* layout of a page table entry */
 struct page_entry {
-	uint32_t	pe_vpn;						/* the vpn of the entry */
-	uint32_t	pe_proc_id;					/* the process id */
+	uint32_t	pe_proc;					/* the process id */
 	uint32_t	pe_ppn;						/* the frame table frame num */
 	char		pe_flags;					/* page permissions and flags */
-	uint32_t	pe_next;					/* pointer to collion next entry */
+	struct page_entry *pe_next;				/* pointer to collion next entry */
 };
 
 /* pointer to the hashed page table */
-struct page_entry *hpt;
+struct page_entry **hpt;
 
 /* number of entries in the page table */
-int hpt_size;	
+unsigned int hpt_size;	
 
 /* the index for the top level free frame in the frame table */
 int cur_free;
@@ -83,6 +82,9 @@ void frametable_init(void);
 
 /* Fault handling function called by trap code */
 int vm_fault(int faulttype, vaddr_t faultaddress);
+
+/* purge hpt and ft for frames belonging to an as */
+void purge_hpt(struct addrspace *as);
 
 /* Allocate/free kernel heap pages (called by kmalloc/kfree) */
 vaddr_t alloc_kpages(unsigned npages);

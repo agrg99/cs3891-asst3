@@ -104,22 +104,31 @@ kvaddr_to_paddr(vaddr_t vaddr){
     return ((vaddr) - MIPS_KSEG0);
 }
 
+/* PPN is also the FINDEX */
 #define FINDEX_TO_KVADDR(int) findex_to_kvaddr(int)
 static inline vaddr_t
 findex_to_kvaddr(int index){
     return(PADDR_TO_KVADDR(index << 12));
 }
 
+/* PPN is also the FINDEX */
 #define KVADDR_TO_FINDEX(vaddr) kvaddr_to_findex(vaddr)
 static inline int
 kvaddr_to_findex(vaddr_t vaddr){
     return(KVADDR_TO_PADDR(vaddr) >> 12);
 }
 
+/* convert an address to a page number (vpn or ppn) */
 #define ADDR_TO_PN(addr) addr_to_pn(addr)
 static inline int
 addr_to_pn(unsigned int addr){
     return((addr & PAGE_FRAME) >> 12);
+}
+
+#define PN_TO_ADDR(pn) pn_to_addr(pn)
+static inline int
+pn_to_addr(unsigned int pn){
+    return((pn << 12) & PAGE_FRAME);
 }
 
 /*
@@ -136,7 +145,8 @@ addr_to_pn(unsigned int addr){
  * We put the stack at the very top of user virtual memory because it
  * grows downwards.
  */
-#define USERSTACK     USERSPACETOP
+#define USERSTACK	    USERSPACETOP
+#define USERSTACK_SIZE	    16*PAGE_SIZE
 
 /*
  * Interface to the low-level module that looks after the amount of
