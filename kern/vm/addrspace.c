@@ -38,6 +38,7 @@
 #include <vm.h>
 #include <mips/vm.h>
 #include <proc.h>
+#include <cpu.h>
 
 
 static int
@@ -57,7 +58,6 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
 as_create(void)
 {
     struct addrspace *as;
-kprintf("creating AS...\n");
 
     as = kmalloc(sizeof(struct addrspace));
     if (as == NULL) {
@@ -66,6 +66,8 @@ kprintf("creating AS...\n");
 
     as->regions = NULL;
 
+
+kprintf("creating AS...%x\n", (uint32_t)as);
     return as;
 }
 
@@ -83,6 +85,15 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 
 kprintf("copyin AS...\n");
 
+
+	if (CURCPU_EXISTS()) {
+		/* must not hold spinlocks */
+		KASSERT(curcpu->c_spinlocks == 0);
+
+		/* must not be in an interrupt handler */
+		KASSERT(curthread->t_in_interrupt == 0);
+	}
+
     struct addrspace *new = as_create();
     if (new==NULL) {
         return ENOMEM;
@@ -90,17 +101,9 @@ kprintf("copyin AS...\n");
 
     /* copy over all regions */
     struct region *region = old->regions;
-    struct region *t_region, *n_region;
-    n_region = kmalloc(sizeof(struct region));
-    *n_region = *region;
-    new->regions = n_region;
     while (region != NULL) {
-        t_region = kmalloc(sizeof(struct region));
-        *t_region = *region;
-        t_region->next = NULL;
-        n_region->next = t_region;
-        n_region = t_region;
-        region = region->next;
+      as_define_region(new, region->start, region->size, 1,1,1);
+      region = region->next;
     }
 
     /* duplicate frames and set the read only bit */
@@ -140,6 +143,7 @@ kprintf("copyin AS...\n");
     void
 as_destroy(struct addrspace *as)
 {
+
 
 kprintf("purging AS...\n");
 
@@ -278,14 +282,6 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
         return result;
     }
 
-    /* set is stack for stack region */
-    struct region *c_re = as->regions;
-    while (c_re->next != NULL) {
-        c_re = c_re->next;
-    }
-    c_re->is_stack = 1;
-
-
     /* Initial user-level stack pointer */
     *stackptr = USERSTACK;
 
@@ -308,7 +304,7 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
     n_region->start = start;
     n_region->size = size;
     n_region->next = NULL;
-    n_region->is_stack = 0;
+    n_region->is_stack = (start == USERSTACK) ? 1 : 0;
 
     /* append the new region to where it fits in the region list */
     t_region = c_region = as->regions;

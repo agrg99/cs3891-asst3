@@ -131,7 +131,7 @@ pop_frame(void)
         ft[c_index].fe_next = VM_INVALID_INDEX;
 
         vaddr_t addr = FINDEX_TO_KVADDR(c_index);       /* find the kvaddr */
-        bzero((void *)addr, PAGE_SIZE);                 /* zero the frame */
+   //     bzero((void *)addr, PAGE_SIZE);                 /* zero the frame */
 
         return addr;
 }
@@ -143,7 +143,7 @@ pop_frame(void)
 push_frame(vaddr_t vaddr)
 {
         int c_index;
-        c_index = KVADDR_TO_FINDEX(vaddr);
+        c_index = ADDR_TO_PN(vaddr);
 
         /* append fe to the start of the freelist */
         if (ft[c_index].fe_refcount == 1) {
@@ -152,10 +152,10 @@ push_frame(vaddr_t vaddr)
                 ft[c_index].fe_next = cur_free;
                 cur_free = c_index;
         } else if (ft[c_index].fe_refcount == 0) {
-                panic("reached 0 refcount\n");
+  //              panic("reached 0 refcount\n");
         } else {
                 ft[c_index].fe_refcount--;
-                kprintf("vaddr %x has new refcount %d\n", vaddr, ft[c_index].fe_refcount); 
+ //               kprintf("vaddr %x has new refcount %d\n", vaddr, ft[c_index].fe_refcount); 
         }
 }
 
