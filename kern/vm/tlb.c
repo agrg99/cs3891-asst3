@@ -13,7 +13,7 @@
 void insert_tlb(int vpn, int ppn)
 {
         int spl = splhigh();
-        vpn = (uint32_t) vpn & TLBHI_VPAGE;  /* mask the vpn */
+        vpn = vpn & PAGE_FRAME;  /* mask the vpn */
         tlb_random(vpn, ppn);
         splx(spl);
 }

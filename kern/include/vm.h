@@ -59,6 +59,7 @@ struct frame_entry *ft;
 struct page_entry {
 	uint32_t	pe_proc;					/* the process id */
 	uint32_t	pe_ppn;						/* the frame table frame num */
+	uint32_t	pe_vpn;						/* the frame table frame num */
 	char		pe_flags;					/* page permissions and flags */
 	struct page_entry *pe_next;				/* pointer to collion next entry */
 };
@@ -79,6 +80,8 @@ void vm_bootstrap(void);
 
 /* init the frametable */
 void frametable_init(void);
+
+void duplicate_hpt(struct addrspace *new, struct addrspace *old);
 
 /* Fault handling function called by trap code */
 int vm_fault(int faulttype, vaddr_t faultaddress);
