@@ -124,13 +124,13 @@ kvaddr_to_findex(vaddr_t vaddr){
 #define ADDR_TO_PN(addr) addr_to_pn(addr)
 static inline int
 addr_to_pn(unsigned int addr){
-    return((addr & PAGE_FRAME) >> 12);
+    return(addr >> 12);
 }
 
 #define PN_TO_ADDR(pn) pn_to_addr(pn)
 static inline int
 pn_to_addr(unsigned int pn){
-    return((pn << 12) & PAGE_FRAME);
+    return(pn << 12);
 }
 
 /*

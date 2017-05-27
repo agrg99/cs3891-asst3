@@ -15,7 +15,7 @@ static uint32_t hpt_hash(struct addrspace *as, vaddr_t faultaddr);
 static struct page_entry * search_hpt(struct addrspace *as, vaddr_t addr);
 static struct page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr);
 
-static struct spinlock spinny_lock = SPINLOCK_INITIALIZER;
+//static struct spinlock spinny_lock = SPINLOCK_INITIALIZER;
 
 /* The following hash function will combine the address of the struct
  * addrspace and faultaddr address to reduce hash collisions between processes
@@ -219,17 +219,24 @@ purge_hpt(struct addrspace *as)
         uint32_t proc = (uint32_t) as;
        // kprintf("purging hpt: %x\n", proc);
         struct page_entry *c_pe, *n_pe, *t_pe;;
-        spinlock_acquire(&spinny_lock);
+        
+        int spl = splhigh();
+
+        ///spinlock_acquire(&spinny_lock);
         for (i=0; i < hpt_size; i++) {
                 n_pe = c_pe = hpt[i];
                 while (c_pe != NULL) {
                         if (c_pe->pe_proc == proc) {
-                                //kprintf("purging %x for %x (row %d)\n", (unsigned int)c_pe->pe_vpn, proc, i);
-                                if (hpt[i] == c_pe)
+                               
+                               
+    //                           kprintf("purging %x for %x (row %d)\n", (unsigned int)c_pe->pe_vpn, proc, i);
+                               
+
+                               if (hpt[i] == c_pe)
                                         t_pe = hpt[i] = n_pe = c_pe->pe_next;
                                 else
                                         t_pe = n_pe->pe_next = c_pe->pe_next;
-                                free_kpages(PN_TO_ADDR(c_pe->pe_ppn));
+                                free_kpages(FINDEX_TO_KVADDR(c_pe->pe_ppn));
                                 kfree(c_pe);
                                 c_pe = t_pe;
                         } else {
@@ -251,7 +258,8 @@ purge_hpt(struct addrspace *as)
                                 */
                 }
         }
-        spinlock_release(&spinny_lock);
+        //spinlock_release(&spinny_lock);
+        splx(spl);
 }
 
 
