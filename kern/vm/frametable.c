@@ -11,7 +11,7 @@ static vaddr_t pop_frame(void);
 static void push_frame(vaddr_t vaddr);
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 
-
+/*
 static void fill_deadbeef(void *vptr, size_t len);
 
 static void fill_deadbeef(void *vptr, size_t len)
@@ -24,7 +24,7 @@ static void fill_deadbeef(void *vptr, size_t len)
 	}
 }
 
-
+*/
         void
 frametable_init()
 {   
@@ -152,7 +152,7 @@ pop_frame(void)
 
         vaddr_t addr = FINDEX_TO_KVADDR(c_index);       /* find the kvaddr */
  //       bzero((void *)addr, PAGE_SIZE);                 /* zero the frame */
-fill_deadbeef((void *)addr, PAGE_SIZE);
+//fill_deadbeef((void *)addr, PAGE_SIZE);
 
 
      /*   int spl = splhigh();

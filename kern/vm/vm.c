@@ -278,6 +278,7 @@ duplicate_hpt(struct addrspace *new, struct addrspace *old)
         unsigned int i;
         
         //spinlock_acquire(&spinny_lock);
+        int spl = splhigh();
         for (i=0; i < hpt_size; i++) {
                 pe = hpt[i];
                 while (pe != NULL) {
@@ -301,7 +302,7 @@ duplicate_hpt(struct addrspace *new, struct addrspace *old)
                                 n_pe->pe_ppn = ADDR_TO_PN(KVADDR_TO_PADDR(nep));
                                 
                                 kprintf("memcpy(%x, %x, %d);\n", (uint32_t)nep, PADDR_TO_KVADDR(PN_TO_ADDR(pe->pe_ppn)), PAGE_SIZE);
-                                memcpy((void *)nep, (void *)PADDR_TO_KVADDR(PN_TO_ADDR(pe->pe_ppn)), PAGE_SIZE);
+                                memcpy((void *)nep, (void *)FINDEX_TO_KVADDR(pe->pe_ppn), PAGE_SIZE);
                                 kprintf("memcpy(%x, %x, %d);\n", (uint32_t)nep, PADDR_TO_KVADDR(PN_TO_ADDR(pe->pe_ppn)), PAGE_SIZE);
                                 kprintf("-------------------------------\n");
                                // kprintf("-------------------------------\n");
@@ -313,6 +314,7 @@ duplicate_hpt(struct addrspace *new, struct addrspace *old)
                 }
         }
        // spinlock_release(&spinny_lock);
+    splx(spl);
 }
 
 /*
