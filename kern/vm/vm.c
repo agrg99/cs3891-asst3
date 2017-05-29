@@ -93,6 +93,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 } else { 
                 //         load from elf
                 } */
+        spl = splhigh();
+   //     kprintf("found vpn %x for AS %x\n", (uint32_t)(faultaddress & PAGE_FRAME), (uint32_t)as); 
+        splx(spl);
 
         } else { /* not in frame table */
                 //    if (region_type(as, faultaddress) == SEG_CODE) {
@@ -102,7 +105,8 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 /* create and insert the page entry */
         //        spinlock_acquire(&spinny_lock);
         spl = splhigh();
-                pe = insert_hpt(as, faultaddress);
+        pe = insert_hpt(as, faultaddress);
+ //       kprintf("inserting vpn %x for AS %x - proc:%x|vpn:%x|ppn:%x\n", (uint32_t)(faultaddress & PAGE_FRAME), (uint32_t)as, pe->pe_proc, pe->pe_vpn, pe->pe_ppn); 
           //      spinlock_release(&spinny_lock);
         splx(spl);
                 //   }
@@ -129,7 +133,7 @@ page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr)
         vaddr_t n_frame = alloc_kpages(1);
         struct page_entry *n_pe = kmalloc(sizeof(struct page_entry));
         uint32_t vpn = ADDR_TO_PN(vaddr);
-        uint32_t ppn = ADDR_TO_PN(KVADDR_TO_PADDR(n_frame));
+        uint32_t ppn = KVADDR_TO_FINDEX(n_frame);
         uint32_t pt_hash = hpt_hash(as, vaddr);
         struct page_entry *pe = hpt[pt_hash];
         
@@ -167,28 +171,33 @@ page_entry * search_hpt(struct addrspace *as, vaddr_t addr)
                 
         /* get the hash index for hpt */
         pt_hash = hpt_hash(as, addr);
+    /*    kprintf("hpt_hash(as, addr) = %d\n", pt_hash);
+        kprintf("hpt_hash(%x, %x) = %d\n", (uint32_t)as, addr, pt_hash);
         
-        //kprintf("hashing addr: %x\n", addr);
-        //kprintf("hash used is: %d\n", pt_hash);
-
+        kprintf("hashing addr: %x\n", addr);
+        kprintf("hash used is: %d\n", pt_hash);
+*/
         /* get addrspace id (secretly the pointer to the addrspace) */
         proc = (uint32_t) as;
 
         /* declare the vpn */
         vpn = ADDR_TO_PN(addr);
 
-        //kprintf("searching for addr 0x%x\n", addr);
-        //kprintf("searching for hash 0x%x\n", pt_hash);
-        //kprintf("searching for vpn 0x%x\n", vpn);
-        //kprintf("searching for proc %x\n", proc);
-
+  /*      kprintf("searching for addr 0x%x\n", addr);
+        kprintf("searching for hash 0x%x\n", pt_hash);
+        kprintf("searching for vpn 0x%x\n", vpn);
+        kprintf("searching for proc %x\n", proc);
+*/
         /* get the page table entry */
         struct page_entry *pe = hpt[pt_hash];
 
+        //kprintf("%x %x\n",proc, vpn);
         /* loop the chain while we don't have an entry for this proc */
         while(pe != NULL) {
+  //                  kprintf("pe->pe_proc == proc && pe->pe_vpn == vpn\n");
+    //                kprintf("%x == %x && %x == %x\n", pe->pe_proc,proc, pe->pe_vpn,vpn);
                 if (pe->pe_proc == proc && pe->pe_vpn == vpn) {
-                        break;
+                    break;
                 }
                 pe = pe->pe_next;
         }
@@ -229,10 +238,10 @@ purge_hpt(struct addrspace *as)
                         if (c_pe->pe_proc == proc) {
                                
                                
-    //                           kprintf("purging %x for %x (row %d)\n", (unsigned int)c_pe->pe_vpn, proc, i);
-                               
+                    //           kprintf("purging %x for %x (row %d)\n", (unsigned int)c_pe->pe_vpn, proc, i);
+                              
 
-                               if (hpt[i] == c_pe)
+                                if (hpt[i] == c_pe)
                                         t_pe = hpt[i] = n_pe = c_pe->pe_next;
                                 else
                                         t_pe = n_pe->pe_next = c_pe->pe_next;
@@ -270,10 +279,11 @@ purge_hpt(struct addrspace *as)
 void
 duplicate_hpt(struct addrspace *new, struct addrspace *old)
 {
-        kprintf("duplicating hpt\n");
-        uint32_t n_proc = (uint32_t) new;
+        //kprintf("duplicating hpt\n");
+ //       uint32_t n_proc = (uint32_t) new;
         uint32_t o_proc = (uint32_t) old;
         struct page_entry *pe;
+   //     struct page_entry *new_pe;
         struct page_entry *n_pe;
         unsigned int i;
         
@@ -285,29 +295,31 @@ duplicate_hpt(struct addrspace *new, struct addrspace *old)
                         /* if we find a matching record, duplicate & insert */
                         n_pe = pe;
                         if (pe->pe_proc == o_proc) {
-                                n_pe = kmalloc(sizeof(struct page_entry));   
-                                *n_pe = *pe;
-                                n_pe->pe_proc = n_proc;
-                                n_pe->pe_next = pe->pe_next;
-                                pe->pe_next = n_pe;
+                                //n_pe = kmalloc(sizeof(struct page_entry));   
+                                n_pe = insert_hpt(new, PN_TO_ADDR(pe->pe_vpn)); 
+                                //*n_pe = *pe;
+                                //n_pe->pe_proc = n_proc;
+                                //n_pe->pe_next = pe->pe_next;
+                                //pe->pe_next = n_pe;
                                 /* disable write bit */
                                // n_pe->pe_flags = SET_PAGE_NOWRITE(n_pe->pe_flags);
                                // pe->pe_flags = SET_PAGE_NOWRITE(pe->pe_flags);
                                 /* increment refcount on frame */
- 
 
 
-                                kprintf("-------------------------------\n");
+     //                           kprintf("-------------------------------\n");
                                 vaddr_t nep = alloc_kpages(1);
-                                n_pe->pe_ppn = ADDR_TO_PN(KVADDR_TO_PADDR(nep));
+                                n_pe->pe_ppn = KVADDR_TO_FINDEX(nep);
                                 
-                                kprintf("memcpy(%x, %x, %d);\n", (uint32_t)nep, PADDR_TO_KVADDR(PN_TO_ADDR(pe->pe_ppn)), PAGE_SIZE);
+       //                         kprintf("memcpy(%x, %x, %d);\n", (uint32_t)nep, PADDR_TO_KVADDR(PN_TO_ADDR(pe->pe_ppn)), PAGE_SIZE);
                                 memcpy((void *)nep, (void *)FINDEX_TO_KVADDR(pe->pe_ppn), PAGE_SIZE);
-                                kprintf("memcpy(%x, %x, %d);\n", (uint32_t)nep, PADDR_TO_KVADDR(PN_TO_ADDR(pe->pe_ppn)), PAGE_SIZE);
-                                kprintf("-------------------------------\n");
+         //                       kprintf("-------------------------------\n");
                                // kprintf("-------------------------------\n");
-                               // kprintf("** pe: %x\n\tproc: %x\n\tvpn: %x\n\tppn: %x\n\tnext: %x\n", (uint32_t)pe, pe->pe_proc, pe->pe_vpn, pe->pe_ppn, (uint32_t)pe->pe_next); 
-                               // kprintf("** n_pe: %x\n\tproc: %x\n\tvpn: %x\n\tppn: %x\n\tnext: %x\n", (uint32_t)n_pe, n_pe->pe_proc, n_pe->pe_vpn, n_pe->pe_ppn, (uint32_t)n_pe->pe_next); 
+           //                     kprintf("**row:%d\npe: %x\n\tproc: %x\n\tvpn: %x\n\tppn: %x\n\tnext: %x\n", i,(uint32_t)pe, pe->pe_proc, pe->pe_vpn, pe->pe_ppn, (uint32_t)pe->pe_next); 
+             //                   kprintf("** n_pe: %x\n\tproc: %x\n\tvpn: %x\n\tppn: %x\n\tnext: %x\n", (uint32_t)n_pe, n_pe->pe_proc, n_pe->pe_vpn, n_pe->pe_ppn, (uint32_t)n_pe->pe_next); 
+         
+                                
+                                
                                 //ft[pe->pe_ppn].fe_refcount++;
                         }
                         pe = n_pe->pe_next;
