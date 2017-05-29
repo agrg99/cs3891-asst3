@@ -67,7 +67,7 @@ as_create(void)
     as->regions = NULL;
 
 
-kprintf("creating AS...%x\n", (uint32_t)as);
+//kprintf("creating AS...%x\n", (uint32_t)as);
     return as;
 }
 
@@ -83,7 +83,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
        - add PT entry for dest
        */
 
-kprintf("copyin AS...\n");
+//kprintf("copyin AS...\n");
 
 
 	if (CURCPU_EXISTS()) {
@@ -145,7 +145,7 @@ as_destroy(struct addrspace *as)
 {
 
 
-kprintf("purging AS...\n");
+//kprintf("purging AS...%x\n", (uint32_t)as);
 
     /* purge the hpt and ft of all records for this AS */
     purge_hpt(as);
@@ -226,7 +226,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
 
     int permissions = (readable << 2 | writeable << 1 | executable); 
 
-    kprintf("defining a region with base %x and top %x\n", vaddr, vaddr+memsize);
+    //kprintf("defining a region with base %x and top %x\n", vaddr, vaddr+memsize);
     
     /* append a region to the address space */
     result = append_region(as, permissions, vaddr, memsize);
