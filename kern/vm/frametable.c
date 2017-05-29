@@ -6,7 +6,8 @@
 #include <vm.h>
 #include <spl.h>
 
-/* define static internal functions */
+
+#define ROUND_UP(N) ((((N) + (PAGE_SIZE) - 1) / (PAGE_SIZE)) * (PAGE_SIZE))
 static vaddr_t pop_frame(void);
 static void push_frame(vaddr_t vaddr);
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
@@ -33,7 +34,7 @@ frametable_init()
         int n_pages, used_pages, i;
 
         /* size of ram and num pages in the system */
-        ram_sz = ram_getsize();
+        ram_sz = ROUND_UP(ram_getsize());
         n_pages = ram_sz / PAGE_SIZE;
 
         /* set the size to init the hpt when we need to */
@@ -53,7 +54,7 @@ frametable_init()
         ft = (struct frame_entry *)kmalloc(ft_size);
 
         /* calc the top of the frame table */
-        ft_top = ram_getfirstfree();
+        ft_top = ROUND_UP(ram_getfirstfree());
         kprintf("[*] Virtual Memory: first free is %p\n", (void *)ft_top);
 
         /* calculate the number of pages used so far */
@@ -151,7 +152,7 @@ pop_frame(void)
         ft[c_index].fe_next = VM_INVALID_INDEX;
 
         vaddr_t addr = FINDEX_TO_KVADDR(c_index);       /* find the kvaddr */
- //       bzero((void *)addr, PAGE_SIZE);                 /* zero the frame */
+        bzero((void *)addr, PAGE_SIZE);                 /* zero the frame */
 //fill_deadbeef((void *)addr, PAGE_SIZE);
 
 
