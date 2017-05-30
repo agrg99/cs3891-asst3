@@ -10,11 +10,11 @@
 /* insert_tlb
  * massages the vpn and vpn such that we can insert them in the tlb
  */
-void insert_tlb(int vpn, int ppn)
+void insert_tlb(int vaddr, int ppn)
 {
         int spl = splhigh();
-        vpn = vpn & PAGE_FRAME;  /* mask the vpn */
-        tlb_random(vpn, ppn);
+        vaddr &= PAGE_FRAME;  /* mask the vpn */
+        tlb_random(vaddr, ppn);
         splx(spl);
 }
 
@@ -29,4 +29,19 @@ void flush_tlb()
                 tlb_write(TLBHI_INVALID(i), TLBLO_INVALID(), i);
         }
         splx(spl);
+}
+
+/* replace a ppn entry in the tlb with something else */
+void replace_tlb(int vaddr, int ppn)
+{
+        vaddr &= PAGE_FRAME;
+ 
+        /* get index where the vaddr is */
+        int index = tlb_probe(vaddr, 0);
+        if (index < 0) {
+                panic("lol");
+        }
+
+        /* replace the ppn with something else */
+        tlb_write(vaddr, ppn, index);
 }

@@ -12,20 +12,6 @@ static vaddr_t pop_frame(void);
 static void push_frame(vaddr_t vaddr);
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 
-/*
-static void fill_deadbeef(void *vptr, size_t len);
-
-static void fill_deadbeef(void *vptr, size_t len)
-{
-	uint32_t *ptr = vptr;
-	size_t i;
-
-	for (i=0; i<len/sizeof(uint32_t); i++) {
-		ptr[i] = 0xdeadbeef;
-	}
-}
-
-*/
         void
 frametable_init()
 {   
@@ -96,9 +82,6 @@ frametable_init()
         vaddr_t
 alloc_kpages(unsigned int npages)
 {
-
-
-
         /* check if the page table or frame table has not been allocated yet */
         if (!ft) {
                 /* vm system not alive - use stealmem */
@@ -145,7 +128,6 @@ pop_frame(void)
         }
 
 
-
         /* alter meta data */
         ft[c_index].fe_used = 1;
         ft[c_index].fe_refcount = 1;
@@ -153,13 +135,7 @@ pop_frame(void)
 
         vaddr_t addr = FINDEX_TO_KVADDR(c_index);       /* find the kvaddr */
         bzero((void *)addr, PAGE_SIZE);                 /* zero the frame */
-//fill_deadbeef((void *)addr, PAGE_SIZE);
-
-
-     /*   int spl = splhigh();
-        kprintf("allocating %x\n", addr);
-        splx(spl);
-  */
+        
         return addr;
 }
 
@@ -171,7 +147,6 @@ push_frame(vaddr_t vaddr)
 {
         int c_index;
         c_index = KVADDR_TO_FINDEX(vaddr);
- //         ADDR_TO_PN(vaddr);
 
         /* append fe to the start of the freelist */
         if (ft[c_index].fe_refcount == 1) {
@@ -180,10 +155,10 @@ push_frame(vaddr_t vaddr)
                 ft[c_index].fe_next = cur_free;
                 cur_free = c_index;
         } else if (ft[c_index].fe_refcount == 0) {
-                panic("reached 0 refcount\n");
+                panic("reached 0 refcount - this should never happen\n");
         } else {
                 ft[c_index].fe_refcount--;
-                kprintf("vaddr %x has new refcount %d\n", vaddr, ft[c_index].fe_refcount); 
+ //               kprintf("vaddr %x has new refcount %d\n", vaddr, ft[c_index].fe_refcount); 
         }
 }
 
