@@ -81,19 +81,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
             case VM_FAULT_WRITE:
                 goto normal_handle;
             case VM_FAULT_READONLY:
-  /*  if(pe) {
-    spl = splhigh();
-        kprintf("*AS:%x vpn:%x  VM\n\tRWX = %d%d%d with region %d hence gw=%d\n\tPTE: RWX = %d%d%d\n", (uint32_t)as, ADDR_TO_PN(faultaddress),(perms & 4)>>2, (perms&2)>>1, perms&1, region, GET_WRITABLE(perms),
-            (pe->pe_flags>>3)&1, (pe->pe_flags>>2)&1, (pe->pe_flags>>1)&1);
-    splx(spl);
-    } else{
-
-        panic("readonly and no page");
- }*/
                 
                 if (!pe)
                     panic("this shouldn't happen");
-                    //goto normal_handle;
                
                 /* region isn't writable anyway so EFAULT */
                 if (!(GET_WRITABLE(perms)))
@@ -109,13 +99,11 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                 return 0;
 
             default:
-                    panic("default in vmfault switch");
-                   //return EINVAL;
+                   return EINVAL;
         }
 
 do_cow:
         spl = splhigh();
-        //kprintf("**********************doing cow\n");
         if (pe) {
             struct frame_entry fe = ft[pe->pe_ppn]; /* get the frame entry */
             if (fe.fe_refcount > 1) {
@@ -151,7 +139,6 @@ normal_handle:
                 //return -1;
                 //    } else {
                 /* create and insert the page entry */
-        //    
             spl = splhigh();
             vaddr_t n_frame = alloc_kpages(1);
             pe = insert_hpt(as, faultaddress, n_frame);
@@ -182,8 +169,6 @@ page_entry * insert_hpt(struct addrspace *as, vaddr_t vaddr, vaddr_t n_frame)
         struct page_entry *pe = hpt[pt_hash];
 
         int perms = region_perms(as, vaddr);
-        //kprintf("inserting page in as %x with vpn %x in region %d with perms=%d%d%d\n",
-        //        (uint32_t)as, ADDR_TO_PN(vaddr), region_type(as, vaddr), perms&4 >> 2, perms&2>>1, perms&1);
 
         /* set up new page */
         n_pe->pe_proc = (uint32_t) as;
