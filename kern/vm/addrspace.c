@@ -66,8 +66,6 @@ as_create(void)
 
     as->regions = NULL;
 
-
-//kprintf("creating AS...%x\n", (uint32_t)as);
     return as;
 }
 
@@ -83,17 +81,6 @@ as_copy(struct addrspace *old, struct addrspace **ret)
        - add PT entry for dest
        */
 
-//kprintf("copyin AS...\n");
-
-
-	if (CURCPU_EXISTS()) {
-		/* must not hold spinlocks */
-		KASSERT(curcpu->c_spinlocks == 0);
-
-		/* must not be in an interrupt handler */
-		KASSERT(curthread->t_in_interrupt == 0);
-	}
-
     struct addrspace *new = as_create();
     if (new==NULL) {
         return ENOMEM;
@@ -102,36 +89,13 @@ as_copy(struct addrspace *old, struct addrspace **ret)
     /* copy over all regions */
     struct region *region = old->regions;
     while (region != NULL) {
-      as_define_region(new, region->start, region->size, 1,1,1);
+        int p = region->cur_perms;
+      as_define_region(new, region->start, region->size, p&4, p&2, p&1);
       region = region->next;
     }
 
     /* duplicate frames and set the read only bit */
     duplicate_hpt(new, old);
-
-    //flush_tlb();
-    /*
-     * it is my understanding we need to loop through the page table and
-     * look at each entry that corresponds to the old addresspace (lucky 
-     * we used the pointer as the process Identifier) and copy all the 
-     * entries to use for the new address space (using the new addrspace 
-     * pointer as the identifier lol) but have them point to the same
-     * physical frame - changing both address spaces to have all pages
-     * as read only. on write to a page that is NOW read only then the frame 
-     * is duplicated for the process that tried to write to it 
-     *
-     * this is why we need to keep a refcount with the frame - if it is
-     * more than one then we need to duplicate the frame and change the 
-     * frame number for the page entry of the address space doing the write
-     */
-
-
-
-    /* set the pages and bases the same? copied from dumvm */
-    //new->as_vbase1 = oldas_vbase1;
-    //new->as_npages1 = old->as_npages1;
-    //new->as_vbase2 = old->as_vbase2;
-    //new->as_npages2 = old->as_npages2;
 
     *ret = new;
     return 0;
@@ -143,10 +107,6 @@ as_copy(struct addrspace *old, struct addrspace **ret)
     void
 as_destroy(struct addrspace *as)
 {
-
-
-//kprintf("purging AS...%x\n", (uint32_t)as);
-
     /* purge the hpt and ft of all records for this AS */
     purge_hpt(as);
 
@@ -160,8 +120,6 @@ as_destroy(struct addrspace *as)
     }
 
     kfree(as);
-
-   // flush_tlb();
 }
 
 
@@ -224,7 +182,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
     /* ...and now the length. */
     memsize = (memsize + PAGE_SIZE - 1) & PAGE_FRAME;
 
-    int permissions = (readable << 2 | writeable << 1 | executable); 
+    int permissions = readable | writeable | executable; 
 
     //kprintf("defining a region with base %x and top %x\n", vaddr, vaddr+memsize);
     
@@ -249,8 +207,6 @@ as_prepare_load(struct addrspace *as)
         regions->cur_perms = 0x7; // RWX
         regions = regions->next;
     }
-
-    flush_tlb();
     return 0;
 }
 
@@ -265,8 +221,6 @@ as_complete_load(struct addrspace *as)
         regions->cur_perms = regions->old_perms;
         regions = regions->next;
     }
-    /* flush read only sections out */
-    flush_tlb();
     return 0;
 }
 
@@ -277,7 +231,7 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
     int result;
     /* allocate the stack region */
-    result = as_define_region(as, USERSTACK, USERSTACK_SIZE, 1, 1, 1);
+    result = as_define_region(as, USERSTACK, USERSTACK_SIZE, 4, 2, 0);
     if (result) {
         return result;
     }
@@ -300,7 +254,7 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
     if (!n_region)
         return EFAULT;
 
-    n_region->cur_perms = permissions;
+    n_region->cur_perms = n_region->old_perms = permissions;
     n_region->start = start;
     n_region->size = size;
     n_region->next = NULL;
@@ -367,5 +321,6 @@ int region_perms(struct addrspace *as, vaddr_t addr)
             return c_region->cur_perms;
         c_region = c_region->next;
     }
+    panic("the fuck");
     return -1;
 }

@@ -53,11 +53,14 @@
 #define GET_PAGE_REF(X)		(X & PAGE_REF) >> 5	/* accessed? */
 #define GET_PAGE_CAD(X)		(X & PAGE_CAD) >> 6	/* bypass cache? */
 
-/* set certain flags */
-#define SET_PAGE_PRES(X)	X | PAGE_PRES		/* 'valid' bit */
-#define SET_PAGE_PROT(X, P)	X | (P << 1)		/* 'valid' bit */
+/* get writeable bit */
+#define GET_WRITABLE(X)		(X >> 1) & 1	/* get writable bit */
 #define SET_PAGE_WRITE(X)	X | 0x4			/* protections */
 #define SET_PAGE_NOWRITE(X)	(X & ~0x4) & 0xFFFFFFFF	/* protections */
+
+/* set certain flags */
+#define SET_PAGE_PRES(X)	X | PAGE_PRES		/* 'valid' bit */
+#define SET_PAGE_PROT(X, P)	X | ((P&0x7)<<1)	/* 'valid' bit */
 #define SET_PAGE_MOD(X)		X | PAGE_MOD		/* 'dirty' bit */
 #define SET_PAGE_REF(X)		X | PAGE_REF		/* accessed? */
 #define SET_PAGE_CAD(X)		X | PAGE_CAD		/* bypass cache? */
