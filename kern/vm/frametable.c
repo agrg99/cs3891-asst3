@@ -4,13 +4,29 @@
 #include <thread.h>
 #include <addrspace.h>
 #include <vm.h>
+#include <spl.h>
 
-/* define static internal functions */
+
+#define ROUND_UP(N) ((((N) + (PAGE_SIZE) - 1) / (PAGE_SIZE)) * (PAGE_SIZE))
 static vaddr_t pop_frame(void);
 static void push_frame(vaddr_t vaddr);
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 
-void
+/*
+static void fill_deadbeef(void *vptr, size_t len);
+
+static void fill_deadbeef(void *vptr, size_t len)
+{
+	uint32_t *ptr = vptr;
+	size_t i;
+
+	for (i=0; i<len/sizeof(uint32_t); i++) {
+		ptr[i] = 0xdeadbeef;
+	}
+}
+
+*/
+        void
 frametable_init()
 {   
         paddr_t ram_sz, ft_top;
@@ -18,7 +34,7 @@ frametable_init()
         int n_pages, used_pages, i;
 
         /* size of ram and num pages in the system */
-        ram_sz = ram_getsize();
+        ram_sz = ROUND_UP(ram_getsize());
         n_pages = ram_sz / PAGE_SIZE;
 
         /* set the size to init the hpt when we need to */
@@ -38,7 +54,7 @@ frametable_init()
         ft = (struct frame_entry *)kmalloc(ft_size);
 
         /* calc the top of the frame table */
-        ft_top = ram_getfirstfree();
+        ft_top = ROUND_UP(ram_getfirstfree());
         kprintf("[*] Virtual Memory: first free is %p\n", (void *)ft_top);
 
         /* calculate the number of pages used so far */
@@ -77,9 +93,12 @@ frametable_init()
  * frame table initialisation function, or check to see if the
  * frame table has been initialised and call ram_stealmem() otherwise.
  */
-vaddr_t
+        vaddr_t
 alloc_kpages(unsigned int npages)
 {
+
+
+
         /* check if the page table or frame table has not been allocated yet */
         if (!ft) {
                 /* vm system not alive - use stealmem */
@@ -113,7 +132,7 @@ alloc_kpages(unsigned int npages)
 /* pop_frame()
  * pops the next available frame from the freelist and returns the kvaddr
  */
-static vaddr_t
+        static vaddr_t
 pop_frame(void)
 {
         int c_index = cur_free;
@@ -125,32 +144,50 @@ pop_frame(void)
                 cur_free = ft[cur_free].fe_next;
         }
 
+
+
         /* alter meta data */
         ft[c_index].fe_used = 1;
+        ft[c_index].fe_refcount = 1;
         ft[c_index].fe_next = VM_INVALID_INDEX;
 
         vaddr_t addr = FINDEX_TO_KVADDR(c_index);       /* find the kvaddr */
         bzero((void *)addr, PAGE_SIZE);                 /* zero the frame */
+//fill_deadbeef((void *)addr, PAGE_SIZE);
 
+
+     /*   int spl = splhigh();
+        kprintf("allocating %x\n", addr);
+        splx(spl);
+  */
         return addr;
 }
 
 /* push_frame()
  * push a frame onto the freelist
  */
-static void
+        static void
 push_frame(vaddr_t vaddr)
 {
         int c_index;
         c_index = KVADDR_TO_FINDEX(vaddr);
+ //         ADDR_TO_PN(vaddr);
 
         /* append fe to the start of the freelist */
-        ft[c_index].fe_used = 0;
-        ft[c_index].fe_next = cur_free;
-        cur_free = c_index;
+        if (ft[c_index].fe_refcount == 1) {
+                ft[c_index].fe_used = 0;
+                ft[c_index].fe_refcount = 0;
+                ft[c_index].fe_next = cur_free;
+                cur_free = c_index;
+        } else if (ft[c_index].fe_refcount == 0) {
+                panic("reached 0 refcount\n");
+        } else {
+                ft[c_index].fe_refcount--;
+                kprintf("vaddr %x has new refcount %d\n", vaddr, ft[c_index].fe_refcount); 
+        }
 }
 
-void
+        void
 free_kpages(vaddr_t addr)
 {
         spinlock_acquire(&stealmem_lock);

@@ -38,10 +38,10 @@
 #define PAGE_SIZE   4096        /* size of VM page */
 #define PAGE_FRAME  0xfffff000	/* mask for getting page number from addr */
 #define PAGE_PRES   0x1		/* mask for getting PPN from page entry */
-#define PAGE_PROT   0x6		/* mask for getting the protection bits */
-#define PAGE_MOD    0x8		/* mask for getting the modified bit */
-#define PAGE_REF    0x10	/* mask for getting the referenced bit */
-#define PAGE_CAD    0x20	/* mask for getting the cache disabled bit */
+#define PAGE_PROT   0xE		/* mask for getting the protection bits */
+#define PAGE_MOD    0x10	/* mask for getting the modified bit */
+#define PAGE_REF    0x20	/* mask for getting the referenced bit */
+#define PAGE_CAD    0x40	/* mask for getting the cache disabled bit */
 
 #define PROT_RO	    0x2		/* read only perms */
 #define PROT_RW	    0x3		/* read write perms */
@@ -49,13 +49,15 @@
 /* mask and shift macro for ease of use */
 #define GET_PAGE_PRES(X)	X & PAGE_PRES		/* 'valid' bit */
 #define GET_PAGE_PROT(X)	(X & PAGE_PROT) >> 1	/* protections */
-#define GET_PAGE_MOD(X)		(X & PAGE_MOD) >> 3	/* 'dirty' bit */
-#define GET_PAGE_REF(X)		(X & PAGE_REF) >> 4	/* accessed? */
-#define GET_PAGE_CAD(X)		(X & PAGE_CAD) >> 5	/* bypass cache? */
+#define GET_PAGE_MOD(X)		(X & PAGE_MOD) >> 4	/* 'dirty' bit */
+#define GET_PAGE_REF(X)		(X & PAGE_REF) >> 5	/* accessed? */
+#define GET_PAGE_CAD(X)		(X & PAGE_CAD) >> 6	/* bypass cache? */
 
 /* set certain flags */
 #define SET_PAGE_PRES(X)	X | PAGE_PRES		/* 'valid' bit */
-#define SET_PAGE_PROT(X, P)	X | P			/* protections */
+#define SET_PAGE_PROT(X, P)	X | (P << 1)		/* 'valid' bit */
+#define SET_PAGE_WRITE(X)	X | 0x4			/* protections */
+#define SET_PAGE_NOWRITE(X)	(X & ~0x4) & 0xFFFFFFFF	/* protections */
 #define SET_PAGE_MOD(X)		X | PAGE_MOD		/* 'dirty' bit */
 #define SET_PAGE_REF(X)		X | PAGE_REF		/* accessed? */
 #define SET_PAGE_CAD(X)		X | PAGE_CAD		/* bypass cache? */
@@ -122,13 +124,13 @@ kvaddr_to_findex(vaddr_t vaddr){
 #define ADDR_TO_PN(addr) addr_to_pn(addr)
 static inline int
 addr_to_pn(unsigned int addr){
-    return((addr & PAGE_FRAME) >> 12);
+    return(addr >> 12);
 }
 
 #define PN_TO_ADDR(pn) pn_to_addr(pn)
 static inline int
 pn_to_addr(unsigned int pn){
-    return((pn << 12) & PAGE_FRAME);
+    return(pn << 12);
 }
 
 /*

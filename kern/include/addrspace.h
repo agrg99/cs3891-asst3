@@ -63,11 +63,12 @@ struct addrspace {
 
 /* regions for sections in binary */
 struct region {
-        char cur_writebit;            /* the permissions of the region */
-        char old_writebit;           /* the original permissions */
+        int cur_perms;            /* the permissions of the region */
+        int old_perms;           /* the original permissions */
         vaddr_t start;              /* virtual address where this lays */
         size_t size;                /* size of the region */
         struct region *next;        /* pointer to the next region */
+        char is_stack;        /* pointer to the next region */
 };
 
 
@@ -130,6 +131,7 @@ int               as_complete_load(struct addrspace *as);
 int               as_define_stack(struct addrspace *as, vaddr_t *initstackptr);
 
 int               region_type(struct addrspace *as, vaddr_t addr);
+int               region_perms(struct addrspace *as, vaddr_t addr);
 
 
 /*
