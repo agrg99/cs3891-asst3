@@ -281,13 +281,6 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
  * find what type of region a virtual address is from. returns 0 if the
  * address isn't within any region.
  */
-#define SEG_UNUSED  0   /* identifier for unused section */
-#define SEG_CODE    1	/* identifier for code section */
-#define SEG_DATA    2	/* identifier for data section */
-#define SEG_HEAP    3	/* identifier for heap section */
-#define SEG_STACK   4	/* identifier for stack section */
-#define SEG_KERNEL  5   /* identifier for any kernel section */
-
 int region_type(struct addrspace *as, vaddr_t addr)
 {
 
@@ -298,18 +291,33 @@ int region_type(struct addrspace *as, vaddr_t addr)
     }
 
     /* loop through all regions in addrspace */
+    vaddr_t region_start;
     vaddr_t region_end;
 
     while (r) {
+
+        region_start = r->start;
         region_end = r->start + r->size;
 
-        if (addr >= r->start && addr <= region_end) {
+        /* stack is treated different */
+        if (r->is_stack) {
+            region_start = r->start - r->size;
+            region_end = r->start;
+        }
+
+        if (addr >= region_start && addr <= region_end) {
             if (r->is_stack) {
                 return SEG_STACK;
             } else if (r->is_heap) {
                 return SEG_HEAP;
             } else {
+                /* we don't have a way to distinguish between
+                 * SEG_CODE and SEG_DATA, and we don't really need to,
+                 * so returning either is fine
+                 */
+
                 return SEG_CODE;
+                // return SEG_DATA;
             }
         }
 

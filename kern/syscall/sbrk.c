@@ -38,7 +38,7 @@ int sys_sbrk(intptr_t amount, int32_t *retval) {
 vaddr_t
 sbrk(intptr_t amount) {
 
-        kprintf("sbrk called: %d\n", (int) amount);
+        kprintf("sbrk called: %d (%p)\n", (int) amount, (void *) amount);
 
         struct addrspace *as;
         struct region *heap_region;
@@ -58,9 +58,9 @@ sbrk(intptr_t amount) {
                 amount += (PAGE_SIZE - amount % PAGE_SIZE);
         }
 
-        /* check that it's not extending into the stack region */
+        /* check that the heap will only be extended into a valid area */
         vaddr_t end_of_heap = heap_region->start + heap_region->size + amount;
-        if (region_type(as, end_of_heap) == SEG_STACK) {
+        if (region_type(as, end_of_heap) != SEG_UNUSED) {
                 return ENOMEM;
         }
         heap_region->size += amount;
