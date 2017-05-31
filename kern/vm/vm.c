@@ -64,7 +64,8 @@ vm_fault(int faulttype, vaddr_t faultaddress)
     }
 
     /* check if request was to a valid region */
-    if (!(region = region_type(as, faultaddress))){
+    region = region_type(as, faultaddress);
+    if (region == SEG_UNUSED || region == SEG_KERNEL) {
         return EFAULT;
     }
 
