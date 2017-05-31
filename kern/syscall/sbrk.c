@@ -38,6 +38,8 @@ int sys_sbrk(intptr_t amount, int32_t *retval) {
 vaddr_t
 sbrk(intptr_t amount) {
 
+        kprintf("sbrk called: %d\n", (int) amount);
+
         struct addrspace *as;
         struct region *heap_region;
 
@@ -57,15 +59,18 @@ sbrk(intptr_t amount) {
         }
 
         /* check that it's not extending into the stack region */
-        vaddr_t end_of_heap = (vaddr_t) heap_region + heap_region->size + amount;
+        vaddr_t end_of_heap = heap_region->start + heap_region->size + amount;
         if (region_type(as, end_of_heap) == SEG_STACK) {
                 return ENOMEM;
         }
         heap_region->size += amount;
 
-        return 0;
+        kprintf("returning: %p\n", (void *) heap_region->start);
+
+        return heap_region->start;
 }
 
+/* returns the virtual address of the new heap */
 vaddr_t
 create_heap(struct addrspace *as) {
         /* get addr of where to create heap
@@ -86,12 +91,39 @@ create_heap(struct addrspace *as) {
                 return ENOMEM;
         }
 
+        /* create region */
         result = as_define_region(as, vaddr, memsz, PF_R, PF_W, 0);
         if (result) {
                 return -1;
         }
 
+        /* set new region as 'heap' type */
+        set_heap(as);
+
+        kprintf("heap created: vaddr %p\n", (void *) vaddr);
+
         return vaddr;
+}
+
+void
+set_heap(struct addrspace *as) {
+
+        struct region *r;
+        struct region *prev;
+
+        r = as->regions;
+        prev = as->regions;
+
+        /* find the stack region */
+        while (!r->is_stack) {
+                kprintf("set heap iterating.. prev: %p, r: %p\n", (void *) prev, (void *) r);
+                prev = r;
+                r = r->next;
+        }
+        
+        /* previous is the heap region, set the flag */
+        prev->is_heap = 1;
+        kprintf("set heap: %p (vaddr %p)\n", (void *) prev, (void *) prev->start);
 }
 
 /* returns either NULL or the address of the heap region */
@@ -103,16 +135,17 @@ get_heap(struct addrspace *as) {
 
         while (r) {
                 if (r->is_heap) {
-                        break;
+                        kprintf("get_heap: returning %p (vaddr %p)\n", (void *) r, (void *) r->start);
+                        return r;
                 }
                 r = r->next;
         }
 
-        return r;
+        return NULL;
 }
 
-/* return an address for which the heap can start at. this address will
- * be where the code/data regions end
+/* return a virtual address for which the heap can start at. this address 
+ * will be where the code/data regions end
  */
 vaddr_t 
 get_heap_address(struct addrspace *as) {
