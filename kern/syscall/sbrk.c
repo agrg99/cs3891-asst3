@@ -35,7 +35,7 @@ int sys_sbrk(intptr_t amount, int32_t *retval) {
         return -1;
 }
 
-void *
+vaddr_t
 sbrk(intptr_t amount) {
 
         struct addrspace *as;
@@ -59,39 +59,39 @@ sbrk(intptr_t amount) {
         /* check that it's not extending into the stack region */
         vaddr_t end_of_heap = (vaddr_t) heap_region + heap_region->size + amount;
         if (region_type(as, end_of_heap) == SEG_STACK) {
-                return (void *)ENOMEM;
+                return ENOMEM;
         }
         heap_region->size += amount;
 
-        return (void *)heap_region;
+        return 0;
 }
 
-void *
+vaddr_t
 create_heap(struct addrspace *as) {
         /* get addr of where to create heap
          * make sure it won't impact on other regions
          * call define_region
          */
 
-        uint32_t vaddr;     /* vaddr of new heap */
-        uint32_t memsz;     /* size of heap */
+        vaddr_t vaddr;     /* vaddr of new heap */
+        size_t memsz;     /* size of heap */
         int result;
 
-        vaddr = (uint32_t) get_heap_address(as);
+        vaddr = get_heap_address(as);
         memsz = PAGE_SIZE;
 
         /* check that it's not extending into the stack region */
         vaddr_t end_of_heap = vaddr + memsz;
         if (region_type(as, end_of_heap)) {
-                return (void *)ENOMEM;
+                return ENOMEM;
         }
 
         result = as_define_region(as, vaddr, memsz, PF_R, PF_W, 0);
         if (result) {
-                return (void *) -1;
+                return -1;
         }
 
-        return (void *) vaddr;
+        return vaddr;
 }
 
 /* returns either NULL or the address of the heap region */
@@ -114,10 +114,10 @@ get_heap(struct addrspace *as) {
 /* return an address for which the heap can start at. this address will
  * be where the code/data regions end
  */
-void *
+vaddr_t 
 get_heap_address(struct addrspace *as) {
 
-        void *new_heap_addr;
+        vaddr_t new_heap_addr;
         struct region *r;
         struct region *prev;
 
@@ -130,12 +130,12 @@ get_heap_address(struct addrspace *as) {
                 r = r->next;
         }
 
-        /* prev is the code region */
-        new_heap_addr = prev + prev->size;
+        /* prev is the data region */
+        new_heap_addr = prev->start + prev->size;
 
         /* make sure it is aligned */
-        if ((vaddr_t)new_heap_addr % 4 != 0) {
-                new_heap_addr += (4 - (vaddr_t)new_heap_addr %4);
+        if ((vaddr_t)new_heap_addr % PAGE_SIZE != 0) {
+                new_heap_addr += (PAGE_SIZE - ((vaddr_t)new_heap_addr % PAGE_SIZE));
         }
 
         return new_heap_addr;
