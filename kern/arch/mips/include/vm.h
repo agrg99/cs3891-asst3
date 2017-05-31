@@ -65,10 +65,12 @@
 #define SET_PAGE_REF(X)		X | PAGE_REF		/* accessed? */
 #define SET_PAGE_CAD(X)		X | PAGE_CAD		/* bypass cache? */
 
+#define SEG_UNUSED  0   /* identifier for unused section */
 #define SEG_CODE    1	/* identifier for code section */
 #define SEG_DATA    2	/* identifier for data section */
 #define SEG_HEAP    3	/* identifier for heap section */
 #define SEG_STACK   4	/* identifier for stack section */
+#define SEG_KERNEL  5   /* identifier for any kernel section */
 
 /*
  * MIPS-I hardwired memory layout:
