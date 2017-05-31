@@ -68,7 +68,8 @@ struct region {
         vaddr_t start;              /* virtual address where this lays */
         size_t size;                /* size of the region */
         struct region *next;        /* pointer to the next region */
-        char is_stack;        /* pointer to the next region */
+        char is_stack;          /* flag for if region is a stack */
+        char is_heap;           /* flag for if region is heap */
 };
 
 

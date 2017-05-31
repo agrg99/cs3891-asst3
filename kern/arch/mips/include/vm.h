@@ -196,4 +196,8 @@ struct tlbshootdown {
 #define TLBSHOOTDOWN_MAX 16
 
 
+/* Address/location of heap */
+#define HEAP_ADDRESS    0x0
+
+
 #endif /* _MIPS_VM_H_ */

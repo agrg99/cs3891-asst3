@@ -259,6 +259,7 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
     n_region->size = size;
     n_region->next = NULL;
     n_region->is_stack = (start == USERSTACK) ? 1 : 0;
+    n_region->is_heap = 0;
 
     /* append the new region to where it fits in the region list */
     t_region = c_region = as->regions;
