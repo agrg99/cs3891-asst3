@@ -29,8 +29,8 @@ int sys_sbrk(intptr_t amount, int32_t *retval) {
         *retval = (int) sbrk(amount);
         kprintf("\n[*] sys_sbrk retval: %p\n", (void *) *retval);
 
-        if (*retval == EINVAL || *retval == ENOMEM) {
-                return -1;
+        if (*retval == EINVAL || *retval == ENOMEM || *retval == -1) {
+                return *retval;
         }
 
         if (retval) {
@@ -65,7 +65,7 @@ sbrk(intptr_t amount) {
 
                 /* create_heap returns the vaddr */
                 vaddr_t v = create_heap(as, amount);
-                kprintf("[*] new heap region created.. %p\n", (void *)v);
+                kprintf("[*] new heap region created.. %p, amount: %p\n", (void *)v, (void *) amount);
                 return v;
                 // return create_heap(as);
         }
@@ -78,18 +78,21 @@ sbrk(intptr_t amount) {
         if (amount > 0) {
                 /* check that the heap will only be extended into a valid area */
                 if (region_type(as, end_of_heap) != SEG_UNUSED) {
+                        kprintf("[*] sbrk(): returning ENOMEM, expanding into unvalid area\n");
                         return ENOMEM;
                 }
 
         } else if (amount < 0) {
                 /* check that the heap will only be reducing into a valid area */
                 if (region_type(as, end_of_heap) != SEG_HEAP || end_of_heap < heap_region->start) {
+                        kprintf("[*] sbrk(): returning EINVAL, reducing into unvalid area\n");
                         return EINVAL;
                 }
         }
 
         heap_region->size += amount;
 
+        kprintf("[*] sbrk(): returning normal\n");
         return heap_region->start;
 }
 
@@ -107,9 +110,11 @@ create_heap(struct addrspace *as, intptr_t amount) {
 
         vaddr = get_heap_address(as);
         memsz = amount;
+        memsz = 0;
 
         /* check that it's not extending into the stack region */
         vaddr_t end_of_heap = vaddr + memsz;
+        kprintf("[*] create_heap(): end_of_heap: %p\n", (void *) end_of_heap);
         if (region_type(as, end_of_heap) != SEG_UNUSED) {
                 kprintf("[*] create_heap(): returning ENOMEM, end_of_heap: %p\n", (void *) end_of_heap);
                 return ENOMEM;
