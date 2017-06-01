@@ -30,14 +30,11 @@ int sys_sbrk(intptr_t amount, int32_t *retval) {
         kprintf("\n[*] sys_sbrk retval: %p\n", (void *) *retval);
 
         if (*retval == EINVAL || *retval == ENOMEM || *retval == -1) {
-                return *retval;
+                return -1;
         }
 
-        if (retval) {
-                return 0;
-        }
+        return 0;
 
-        return -1;
 }
 
 vaddr_t
@@ -51,18 +48,19 @@ sbrk(intptr_t amount) {
         as = proc_getas();
         heap_region = get_heap(as);
 
+        kprintf("[*] amount is %x\n", (int)amount);
         /* page align the given amount (only if amount != 0) */
         if (amount && amount % PAGE_SIZE != 0) {
                 amount += (PAGE_SIZE - amount % PAGE_SIZE);
         }
-
-
+        kprintf("[*] new amount is %x\n", (int)amount);
+        
         /* if heap region doesn't exist, create it */
         if (!heap_region) {
                 if (amount < 0) {
                         return EINVAL;
                 }
-
+                
                 /* create_heap returns the vaddr */
                 vaddr_t v = create_heap(as, amount);
                 kprintf("[*] new heap region created.. %p, amount: %p\n", (void *)v, (void *) amount);
@@ -70,6 +68,7 @@ sbrk(intptr_t amount) {
                 // return create_heap(as);
         }
 
+        /* break value before the set break */
         int og_break = heap_region->start + heap_region->size;
 
         /* heap region exists. */
@@ -113,7 +112,6 @@ create_heap(struct addrspace *as, intptr_t amount) {
 
         vaddr = get_heap_address(as);
         memsz = amount;
-        //memsz = 0;
 
         /* check that it's not extending into the stack region */
         vaddr_t end_of_heap = vaddr + memsz;
@@ -197,11 +195,15 @@ get_heap_address(struct addrspace *as) {
 
         /* prev is the data region */
         new_heap_addr = prev->start + prev->size;
+        
+        kprintf("[*] old heap addr before align = %x\n", new_heap_addr);
 
         /* make sure it is aligned */
         if ((vaddr_t)new_heap_addr % PAGE_SIZE != 0) {
                 new_heap_addr += (PAGE_SIZE - ((vaddr_t)new_heap_addr % PAGE_SIZE));
         }
+
+        kprintf("[*] new heap addr before align = %x\n", new_heap_addr);
 
         return new_heap_addr;
 }

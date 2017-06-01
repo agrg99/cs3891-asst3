@@ -307,7 +307,7 @@ int region_type(struct addrspace *as, vaddr_t addr)
             region_end = r->start;
         }
 
-        if (addr >= region_start && addr <= region_end) {
+        if (addr >= region_start && addr < region_end) {
             if (r->is_stack) {
                 return SEG_STACK;
             } else if (r->is_heap) {
