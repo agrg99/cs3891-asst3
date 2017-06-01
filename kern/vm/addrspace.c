@@ -298,10 +298,12 @@ int region_type(struct addrspace *as, vaddr_t addr)
 
         region_start = r->start;
         region_end = r->start + r->size;
+        region_end -= 1;        // avoid fence post error
 
         /* stack is treated different */
         if (r->is_stack) {
             region_start = r->start - r->size;
+            region_start -= 1;  // avoid fence post error
             region_end = r->start;
         }
 

@@ -27,6 +27,11 @@
 int sys_sbrk(intptr_t amount, int32_t *retval) {
 
         *retval = (int) sbrk(amount);
+        kprintf("\n[*] sys_sbrk retval: %p\n", (void *) *retval);
+
+        if (*retval == EINVAL || *retval == ENOMEM) {
+                return -1;
+        }
 
         if (retval) {
                 return 0;
@@ -38,7 +43,7 @@ int sys_sbrk(intptr_t amount, int32_t *retval) {
 vaddr_t
 sbrk(intptr_t amount) {
 
-        kprintf("sbrk called: %d (%p)\n", (int) amount, (void *) amount);
+        kprintf("[*] sbrk called: %d (%p)\n", (int) amount, (void *) amount);
 
         struct addrspace *as;
         struct region *heap_region;
@@ -46,33 +51,51 @@ sbrk(intptr_t amount) {
         as = proc_getas();
         heap_region = get_heap(as);
 
-        /* if heap region doesn't exist, create it */
-        if (!heap_region) {
-                return create_heap(as);
-        }
-
-        /* heap region exists. extend it */
-
         /* page align the given amount (only if amount != 0) */
         if (amount && amount % PAGE_SIZE != 0) {
                 amount += (PAGE_SIZE - amount % PAGE_SIZE);
         }
 
-        /* check that the heap will only be extended into a valid area */
-        vaddr_t end_of_heap = heap_region->start + heap_region->size + amount;
-        if (region_type(as, end_of_heap) != SEG_UNUSED) {
-                return ENOMEM;
-        }
-        heap_region->size += amount;
 
-        kprintf("returning: %p\n", (void *) heap_region->start);
+        /* if heap region doesn't exist, create it */
+        if (!heap_region) {
+                if (amount < 0) {
+                        return EINVAL;
+                }
+
+                /* create_heap returns the vaddr */
+                vaddr_t v = create_heap(as, amount);
+                kprintf("[*] new heap region created.. %p\n", (void *)v);
+                return v;
+                // return create_heap(as);
+        }
+
+
+        /* heap region exists. */
+
+        vaddr_t end_of_heap = heap_region->start + heap_region->size + amount;
+
+        if (amount > 0) {
+                /* check that the heap will only be extended into a valid area */
+                if (region_type(as, end_of_heap) != SEG_UNUSED) {
+                        return ENOMEM;
+                }
+
+        } else if (amount < 0) {
+                /* check that the heap will only be reducing into a valid area */
+                if (region_type(as, end_of_heap) != SEG_HEAP || end_of_heap < heap_region->start) {
+                        return EINVAL;
+                }
+        }
+
+        heap_region->size += amount;
 
         return heap_region->start;
 }
 
 /* returns the virtual address of the new heap */
 vaddr_t
-create_heap(struct addrspace *as) {
+create_heap(struct addrspace *as, intptr_t amount) {
         /* get addr of where to create heap
          * make sure it won't impact on other regions
          * call define_region
@@ -83,11 +106,12 @@ create_heap(struct addrspace *as) {
         int result;
 
         vaddr = get_heap_address(as);
-        memsz = PAGE_SIZE;
+        memsz = amount;
 
         /* check that it's not extending into the stack region */
         vaddr_t end_of_heap = vaddr + memsz;
-        if (region_type(as, end_of_heap)) {
+        if (region_type(as, end_of_heap) != SEG_UNUSED) {
+                kprintf("[*] create_heap(): returning ENOMEM, end_of_heap: %p\n", (void *) end_of_heap);
                 return ENOMEM;
         }
 
