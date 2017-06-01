@@ -70,6 +70,7 @@ sbrk(intptr_t amount) {
                 // return create_heap(as);
         }
 
+        int og_break = heap_region->start + heap_region->size;
 
         /* heap region exists. */
 
@@ -84,16 +85,18 @@ sbrk(intptr_t amount) {
 
         } else if (amount < 0) {
                 /* check that the heap will only be reducing into a valid area */
-                if (region_type(as, end_of_heap) != SEG_HEAP || end_of_heap < heap_region->start) {
+                if (end_of_heap < heap_region->start) {
                         kprintf("[*] sbrk(): returning EINVAL, reducing into unvalid area\n");
                         return EINVAL;
                 }
         }
 
+        /* inclusive of amount = 0 */
+
         heap_region->size += amount;
 
         kprintf("[*] sbrk(): returning normal\n");
-        return heap_region->start;
+        return og_break;
 }
 
 /* returns the virtual address of the new heap */
@@ -110,7 +113,7 @@ create_heap(struct addrspace *as, intptr_t amount) {
 
         vaddr = get_heap_address(as);
         memsz = amount;
-        memsz = 0;
+        //memsz = 0;
 
         /* check that it's not extending into the stack region */
         vaddr_t end_of_heap = vaddr + memsz;
