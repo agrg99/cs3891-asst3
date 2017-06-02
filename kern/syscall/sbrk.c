@@ -69,7 +69,7 @@ sbrk(intptr_t amount) {
         }
 
         /* break value before the set break */
-        //int og_break = heap_region->start + heap_region->size;
+        int og_break = heap_region->start + heap_region->size;
 
         /* heap region exists. */
 
