@@ -27,7 +27,6 @@
 int sys_sbrk(intptr_t amount, int32_t *retval) {
 
         *retval = (int) sbrk(amount);
-        kprintf("\n[*] sys_sbrk retval: %p\n", (void *) *retval);
 
         if (*retval == EINVAL || *retval == ENOMEM || *retval == -1) {
                 return *retval;
@@ -42,8 +41,6 @@ int sys_sbrk(intptr_t amount, int32_t *retval) {
 
 vaddr_t
 sbrk(intptr_t amount) {
-
-        kprintf("[*] sbrk called: %d (%p)\n", (int) amount, (void *) amount);
 
         struct addrspace *as;
         struct region *heap_region;
@@ -64,13 +61,9 @@ sbrk(intptr_t amount) {
                 }
 
                 /* create_heap returns the vaddr */
-                vaddr_t v = create_heap(as, amount);
-                kprintf("[*] new heap region created.. %p, amount: %p\n", (void *)v, (void *) amount);
-                return v;
-                // return create_heap(as);
+                return create_heap(as, amount);
         }
 
-        int og_break = heap_region->start + heap_region->size;
 
         /* heap region exists. */
 
@@ -79,23 +72,23 @@ sbrk(intptr_t amount) {
         if (amount > 0) {
                 /* check that the heap will only be extended into a valid area */
                 if (region_type(as, end_of_heap) != SEG_UNUSED) {
-                        kprintf("[*] sbrk(): returning ENOMEM, expanding into unvalid area\n");
                         return ENOMEM;
                 }
 
         } else if (amount < 0) {
                 /* check that the heap will only be reducing into a valid area */
                 if (end_of_heap < heap_region->start) {
-                        kprintf("[*] sbrk(): returning EINVAL, reducing into unvalid area\n");
                         return EINVAL;
                 }
         }
 
-        /* inclusive of amount = 0 */
 
+        /* return the previous break address */
+        int og_break = heap_region->start + heap_region->size;
+
+        /* inclusive of amount = 0 */
         heap_region->size += amount;
 
-        kprintf("[*] sbrk(): returning normal\n");
         return og_break;
 }
 
@@ -113,13 +106,10 @@ create_heap(struct addrspace *as, intptr_t amount) {
 
         vaddr = get_heap_address(as);
         memsz = amount;
-        //memsz = 0;
 
         /* check that it's not extending into the stack region */
         vaddr_t end_of_heap = vaddr + memsz;
-        kprintf("[*] create_heap(): end_of_heap: %p\n", (void *) end_of_heap);
         if (region_type(as, end_of_heap) != SEG_UNUSED) {
-                kprintf("[*] create_heap(): returning ENOMEM, end_of_heap: %p\n", (void *) end_of_heap);
                 return ENOMEM;
         }
 
@@ -131,8 +121,6 @@ create_heap(struct addrspace *as, intptr_t amount) {
 
         /* set new region as 'heap' type */
         set_heap(as);
-
-        kprintf("heap created: vaddr %p\n", (void *) vaddr);
 
         return vaddr;
 }
@@ -148,14 +136,12 @@ set_heap(struct addrspace *as) {
 
         /* find the stack region */
         while (!r->is_stack) {
-                kprintf("set heap iterating.. prev: %p, r: %p\n", (void *) prev, (void *) r);
                 prev = r;
                 r = r->next;
         }
         
         /* previous is the heap region, set the flag */
         prev->is_heap = 1;
-        kprintf("set heap: %p (vaddr %p)\n", (void *) prev, (void *) prev->start);
 }
 
 /* returns either NULL or the address of the heap region */
@@ -167,7 +153,6 @@ get_heap(struct addrspace *as) {
 
         while (r) {
                 if (r->is_heap) {
-                        kprintf("get_heap: returning %p (vaddr %p)\n", (void *) r, (void *) r->start);
                         return r;
                 }
                 r = r->next;
