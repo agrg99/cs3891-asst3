@@ -259,6 +259,7 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
     n_region->size = size;
     n_region->next = NULL;
     n_region->is_stack = (start == USERSTACK) ? 1 : 0;
+    n_region->is_heap = 0;
 
     /* append the new region to where it fits in the region list */
     t_region = c_region = as->regions;
@@ -282,24 +283,50 @@ append_region(struct addrspace *as, int permissions, vaddr_t start, size_t size)
  */
 int region_type(struct addrspace *as, vaddr_t addr)
 {
-    struct region *c_region = as->regions;
-    int index = 1;
-    /* loop through all regions in addrspace */
-    while (c_region != NULL)
-    {
-        /* check for the stack */
-        if (c_region->is_stack) {
-            if ((addr < c_region->start) && addr > (c_region->start - c_region->size))
-                return SEG_STACK;
-            else
-                return 0;
-        }
-        if ((addr >= c_region->start) && addr < (c_region->start + c_region->size))
-            return index;
-        c_region = c_region->next;
-        index++;
+
+    struct region *r = as->regions;
+
+    if (addr >= USERSTACK) {
+        return SEG_KERNEL;
     }
-    return 0;
+
+    /* loop through all regions in addrspace */
+    vaddr_t region_start;
+    vaddr_t region_end;
+
+    while (r) {
+
+        region_start = r->start;
+        region_end = r->start + r->size;
+        region_end -= 1;        // avoid fence post error
+
+        /* stack is treated different */
+        if (r->is_stack) {
+            region_start = r->start - r->size;
+            region_start -= 1;  // avoid fence post error
+            region_end = r->start;
+        }
+
+        if (addr >= region_start && addr <= region_end) {
+            if (r->is_stack) {
+                return SEG_STACK;
+            } else if (r->is_heap) {
+                return SEG_HEAP;
+            } else {
+                /* we don't have a way to distinguish between
+                 * SEG_CODE and SEG_DATA, and we don't really need to,
+                 * so returning either is fine
+                 */
+
+                return SEG_CODE;
+                // return SEG_DATA;
+            }
+        }
+
+        r = r->next;
+    }
+
+    return SEG_UNUSED;
 }
 
 /* region_perms

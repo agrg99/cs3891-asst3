@@ -262,6 +262,11 @@ syscall(struct trapframe *tf)
 		break;
 
 
+           /* asst3 extended: sbrk */
+           case SYS_sbrk:
+                err = sys_sbrk(tf->tf_a0, &retval);
+                break;
+
 
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
