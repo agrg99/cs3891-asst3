@@ -1,4 +1,4 @@
-# Design
+# Design doc
 
 
 ## Identify an approach to allocate the memory that will become your frame table and implement it.
@@ -40,6 +40,9 @@ Before the frame table is initialised the spinlock surrounds the `ram_stealmem()
 
 ## Understand how the page table works, and its relationship with the TLB.
 
+The page table keeps track of a process id, physical page address, virtual page address, flags and a link to the next entry. Once memory has been allocated then a page entry is created and inserted into the TLB after a fault (when an address which lies within that frame has been requested to be accessed).
+
+TLB keeps track of page table entries for a given address space. The TLB can be flushed, pages can be replaced, or pages can be found via `tlb_probe()`. Pages are found by hashing the virtual address and a page frame mask to look up an entry within the hashed page table.
 
 
 ## Work out a basic design for your page table implementation.
