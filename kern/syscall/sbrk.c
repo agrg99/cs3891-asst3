@@ -95,7 +95,7 @@ sbrk(intptr_t amount) {
         heap_region->size += amount;
 
         kprintf("[*] sbrk(): returning normal\n");
-        return heap_region->size + heap_region->size;
+        return og_break;
 }
 
 /* returns the virtual address of the new heap */
