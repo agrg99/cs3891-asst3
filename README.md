@@ -1,4 +1,4 @@
-# COMP3891 Extended Operating Systems 2017/S1
+# COMP3891 Extended Operating Systems 2017/S1 - Assignment 3 (Memory Management)
 
 > In this assignment you will implement the virtual memory sub-system of OS/161. The existing VM implementation in OS/161, dumbvm, is a minimal implementation with a number of shortcomings. In this assignment you will adapt OS/161 to take full advantage of the simulated hardware by implementing management of the MIPS software-managed Translation Lookaside Buffer (TLB). You will write the code to manage this TLB. You will also write code to manage system memory.
 
